@@ -1,32 +1,24 @@
 # 📄 Dosya Yolu: /TurkuazAV/docs/architecture.md
-# 📌 Amac: Katmanlari, platform sinirlarini ve sonraki asamalari belgelemek
-# 📌 Modul - FileType: Architecture - Markdown
-# Version: 0.1.0
-# Aciklama: Katmanlari, platform sinirlarini ve sonraki asamalari belgelemek
+# 📌 Amac: Imzali kurallar ve platform sinirlarini teknik olarak aciklamak
+# 📌 Modul - FileType: Markdown
+# Version: 0.2.0
+# Aciklama: Imzali kurallar ve platform sinirlarini teknik olarak aciklamak
 # Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
 
-# Ilk mimari
+# TurkuazAV 0.2.0 mimari
 
-TurkuazAV.Core, Windows ve Linux uzerinde ayni .NET tarama
-orkestrasyonunu ve SHA-256 aracini kullanir. TurkuazAV.Cli, platform
-bagimsiz giris arayuzudur. Windows WinUI, Linux ve macOS platform
-adapterleri sonraki asamalarda ayri moduller olacaktir.
+Controller yalnizca girdi alir, Service'i cagirir.
+Service hedef dosya boyutunu, kural imza politikasini ve temp kopyayi yonetir.
+Repository ham kural, imza ve public key dosyalarini boyut siniri ile okur.
+Tool RSA-PSS dogrulamasini ve `yr` subprocess calismasini uyarlar.
+View raporlar; Language kullanici mesajlarini tanimlar.
 
-Controller -> Service -> Repository + Tool -> View -> Language akisi
-korunur. Config tum varsayilanlari merkezilestirir.
+Gecerli imzali kaynak kural paketleri taranir. Icerigi degistirilen
+kural dosyasi imza denetiminden gecemez.
+Buradaki public key dosyasi kullanici girdisi oldugu icin
+uzaktan dagitilan kurallara kendiliginden guven saglamaz.
 
-0.1.0 davranislari:
-- Verilen dosya veya dizinin normal dosyalarini gez.
-- Sembolik baglanti olan dosya ve klasorleri takip etme.
-- Boyut limitini asan dosyalari atla.
-- Okunabilen dosyalarin SHA-256 degerini raporla.
-- Dosyalari degistirme, silme, karantinaya alma veya calistirma.
+YARA-X CLI: `yr scan --output-format=ndjson RULES TARGET`.
 
-SHA-256 degeri tek basina zararli tespiti degildir. YARA-X, imzali
-kural guncellemeleri ve guvenilirlik kararlari sonraki fazlara aittir.
-
-CI icin GitHub hosted runner kullanilir. Public PR calismalarini
-self-hosted FURY runner'da otomatik calistirmak guvenlik riski tasir.
-
-MacOS test runner ve guvenlik API izinleri dogrulanmadan MacOS
-destegi tamamlandi olarak duyurulmaz.
+Bilinen eksikler: gercek `yr` E2E, engine binari guveni,
+target TOCTOU, uretim imza anahtari pinleme, sanal alan izolasyonu.
