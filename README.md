@@ -1,7 +1,7 @@
 # 📄 Dosya Yolu: /TurkuazAV/README.md
-# 📌 Amac: TurkuazAV 0.3.0 GUI ve guvenli tarama test mimarisini tanimlamak
+# 📌 Amac: TurkuazAV 0.3.1 GUI ve guvenli tarama test mimarisini tanimlamak
 # 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.3.0
+# Version: 0.3.1
 # Aciklama: WinUI 3 preview ile ortak Windows/Linux tarama altyapisi
 # Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
 
@@ -10,7 +10,7 @@
 TurkuazAV, coklu platform icin deneysel dosya analiz ve guvenlik
 altyapisi projesidir. **Bu surum tam bir antivirus degildir.**
 
-## Surum 0.3.0 (Windows WinUI 3 test arayuzu)
+## Surum 0.3.1 (Windows WinUI 3 test arayuzu)
 
 Windows uygulamasinda:
 
@@ -19,7 +19,9 @@ Windows uygulamasinda:
 - Basarili, atlanan ve hatali tarama raporu
 - Hash degerini kopyalamaya uygun, salt okunur rapor kutusu
 - Iptal destegi ve tarama sirasinda kilitlenen tekrarli butonlar
-- Oturum icinde tarama gecmisi (bellekte, diske kaydedilmez)
+- Oturum icinde en fazla 20 tarama kaydi (bellekte, diske kaydedilmez)
+- Tarama ozeti icin panoya kopyala butonu ve gecmis temizleme
+- Yeni dosyada onceki SHA-256 sonucunu temizleme
 - Acik bir deneysel surum/bagimsiz antivirus uyarisı
 
 Windows arayuzu **yalnizca SHA-256 dosya ozeti** hesaplar.
@@ -38,18 +40,30 @@ dotnet restore src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj -p:Platform=x64
 dotnet build src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj -c Release -p:Platform=x64
 ```
 
+WinUI acilis olaylari ve hata turleri, dosya adlari ve tarama ozetleri
+olmadan `%LOCALAPPDATA%\\TurkuazAV\\diagnostics` altina kaydedilir.
+Loglar yerelde tutulur, yedi gun sonra eski dosyalar temizlenir.
+Bu bir gizlilik odakli tani kaydidir; virus uyarisi veya otomatik
+telemetri degildir.
+
 Windows'ta olusan TurkuazAV.Desktop.exe uygulamasi ile dosya
 secebilir ve tek dosya taramasi yapabilirsiniz.
-Bu bir *CI derleme dogrulamasi* olup, otomatik GUI calistirma
+Bu bir *CI derleme + paket butunlugu dogrulamasi* olup,
+otomatik GUI calistirma
 ve ekrandan test (UI automation) henuz bulunmamaktadir.
 Windows GUI ilk dogrulamasi GitHub-hosted Windows 2022 runner
 uzerinde; Linux ortak motor CI'si eskisi gibi devam eder.
 
 Basarili `main` CI calismalarinda yalnizca **imzasiz yerel test icin**
-`TurkuazAV-0.3.0-UNSIGNED-LOCAL-TEST-win-x64` adli artifact bulunur.
+`TurkuazAV-0.3.1-UNSIGNED-LOCAL-TEST-win-x64` adli artifact bulunur.
 Tum klasoru cikartip `TurkuazAV.Desktop.exe` dosyasini calistirin.
 Guncel antivirus uyarisini korumayi devre disi birakarak asmayan;
 uygulamayi test makinasi/izole VM ile sinirlandiran bir yontem izleyin.
+
+GitHub Actions, test paketine exe SHA-256 ve gerekli calistirma dosyalari
+kontrolu uygular; ayrica UI report formatter regresyon testleri kosar.
+Bununla birlikte gercek interaktif Windows masaustu acilisi ve dosya
+secici davranisi kullanici makinesinde/Windows VM'de dogrulanmalidir.
 
 ## CLI ve guvenlik regresyonlari
 

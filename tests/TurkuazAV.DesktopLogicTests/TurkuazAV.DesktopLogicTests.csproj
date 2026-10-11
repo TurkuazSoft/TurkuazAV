@@ -1,0 +1,22 @@
+<!--
+# 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.DesktopLogicTests/TurkuazAV.DesktopLogicTests.csproj
+# 📌 Amac: Windows arayuzu formatlayici mantigini WinUI bagimliligi olmadan sinamak
+# 📌 Modul - FileType: XML
+# Version: 0.3.1
+# Aciklama: Windows arayuzu formatlayici mantigini WinUI bagimliligi olmadan sinamak
+# Bagimli Oldugu Katman: View | Model-->
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/TurkuazAV.Core/TurkuazAV.Core.csproj" />
+    <Compile Include="../../src/TurkuazAV.Desktop/views/ScanReportFormatter.cs"
+             Link="views/ScanReportFormatter.cs" />
+    <Compile Include="../../src/TurkuazAV.Desktop/language/DesktopMessages.cs"
+             Link="language/DesktopMessages.cs" />
+    <Compile Include="../../src/TurkuazAV.Desktop/config/DesktopSettings.cs"
+             Link="config/DesktopSettings.cs" />
+  </ItemGroup>
+</Project>

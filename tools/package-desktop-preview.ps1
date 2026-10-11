@@ -1,7 +1,7 @@
 # 📄 Dosya Yolu: /TurkuazAV/tools/package-desktop-preview.ps1
 # 📌 Amac: Imzasiz Windows WinUI test paketini sadece dogrulanmis CI buildinden olusturmak
 # 📌 Modul - FileType: Tool - PowerShell
-# Version: 0.3.0
+# Version: 0.3.1
 # Aciklama: Release build dosyalarini sandbox icin kopyalar ve SHA256 kaydi uretir
 # Bagimli Oldugu Katman: Tool | Config
 
@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $source = Join-Path $root 'src/TurkuazAV.Desktop/bin/x64/Release/net10.0-windows10.0.26100.0/win-x64'
-$target = Join-Path $root 'artifacts/TurkuazAV-0.3.0-UNSIGNED-LOCAL-TEST-win-x64'
+$target = Join-Path $root 'artifacts/TurkuazAV-0.3.1-UNSIGNED-LOCAL-TEST-win-x64'
 $executable = Join-Path $source 'TurkuazAV.Desktop.exe'
 
 if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
@@ -20,7 +20,7 @@ New-Item -Path $target -ItemType Directory -Force | Out-Null
 Copy-Item -Path (Join-Path $source '*') -Destination $target -Recurse -Force
 
 $readme = @(
-    'TurkuazAV 0.3.0 - UNSIGNED LOCAL TEST BUILD',
+    'TurkuazAV 0.3.1 - UNSIGNED LOCAL TEST BUILD',
     '',
     'This is an EXPERIMENTAL read-only SHA256 file analyzer.',
     'This is NOT a certified antivirus or realtime protection.',
@@ -30,7 +30,9 @@ $readme = @(
     'Run TurkuazAV.Desktop.exe from inside the extracted directory.',
     'Do not ignore antivirus warnings or create blanket AV exclusions.',
     'Test only with harmless files on a test device or isolated VM.',
-    'Report startup/crash issues with Windows version and app logs.',
+    'For startup issues check %LOCALAPPDATA%/TurkuazAV/diagnostics (7-day event-only log).',
+    'Logs do not contain filenames, SHA256 results or exception messages.',
+    'Report startup issues without sharing private files.',
     '',
     'Source: https://github.com/TurkuazSoft/TurkuazAV'
 )
@@ -40,4 +42,5 @@ $hash = (Get-FileHash -LiteralPath (Join-Path $target 'TurkuazAV.Desktop.exe') -
 "TurkuazAV.Desktop.exe  SHA256: $hash" |
     Set-Content -LiteralPath (Join-Path $target 'SHA256.txt') -Encoding UTF8
 
+& (Join-Path $PSScriptRoot 'verify-desktop-preview.ps1') -PackageRoot $target
 Write-Host 'TURKUAZAV_UNSIGNED_PREVIEW_PACKAGE_OK'

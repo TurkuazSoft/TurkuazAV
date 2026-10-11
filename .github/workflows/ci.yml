@@ -1,7 +1,7 @@
 # 📄 Dosya Yolu: /TurkuazAV/.github/workflows/ci.yml
 # 📌 Amac: Windows Linux motor testleri ve Windows WinUI 3 derleme kontrolu
 # 📌 Modul - FileType: CI - YAML
-# Version: 0.3.0
+# Version: 0.3.1
 # Aciklama: GitHub-hosted runner uzerinde WinUI build ve ortak core E2E
 # Bagimli Oldugu Katman: Tool | Config
 
@@ -55,14 +55,16 @@ jobs:
         run: dotnet restore src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj -p:Platform=x64
       - name: Build WinUI desktop
         run: dotnet build src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj --configuration Release --no-restore -p:Platform=x64
-      - name: Prepare unsigned Windows test package
+      - name: Run desktop report regression tests
+        run: dotnet run --project tests/TurkuazAV.DesktopLogicTests --configuration Release
+      - name: Prepare and verify unsigned Windows test package
         shell: pwsh
         run: ./tools/package-desktop-preview.ps1
       - name: Upload unsigned Windows test package
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: TurkuazAV-0.3.0-UNSIGNED-LOCAL-TEST-win-x64
-          path: artifacts/TurkuazAV-0.3.0-UNSIGNED-LOCAL-TEST-win-x64/
+          name: TurkuazAV-0.3.1-UNSIGNED-LOCAL-TEST-win-x64
+          path: artifacts/TurkuazAV-0.3.1-UNSIGNED-LOCAL-TEST-win-x64/
           if-no-files-found: error
           retention-days: 7

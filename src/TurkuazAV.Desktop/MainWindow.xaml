@@ -1,9 +1,9 @@
 <!--
 # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Desktop/MainWindow.xaml
-# 📌 Amac: Dosya secimi, hash raporu ve oturum gecmisini gostermek
+# 📌 Amac: Oturum gecmisi kontrolu, hash kopyalama ve dosya secim ekrani sunmak
 # 📌 Modul - FileType: XAML
-# Version: 0.3.0
-# Aciklama: Dosya secimi, hash raporu ve oturum gecmisini gostermek
+# Version: 0.3.1
+# Aciklama: Oturum gecmisi kontrolu, hash kopyalama ve dosya secim ekrani sunmak
 # Bagimli Oldugu Katman: View
 -->
 
@@ -16,7 +16,7 @@
         <StackPanel Padding="32" Spacing="20" MinWidth="650">
             <StackPanel Spacing="5">
                 <TextBlock Text="TurkuazAV" FontSize="30" FontWeight="SemiBold"/>
-                <TextBlock Text="DOSYA ANALIZI  /  0.3.0 PREVIEW"
+                <TextBlock Text="DOSYA ANALIZI  /  0.3.1 PREVIEW"
                            FontSize="12" Opacity="0.7"/>
             </StackPanel>
 
@@ -52,13 +52,15 @@
                 <StackPanel Spacing="12">
                     <TextBlock Text="Son analiz raporu" FontSize="20" FontWeight="SemiBold"/>
                     <TextBlock Text="Durum" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="ResultStatusText" Text="Rapor yok."/>
+                    <TextBlock x:Name="ResultStatusText" Text="Rapor yok." TextWrapping="Wrap"/>
                     <TextBlock Text="Dosya boyutu" FontWeight="SemiBold"/>
                     <TextBlock x:Name="ResultSizeText" Text="—"/>
-                    <TextBlock Text="SHA-256 (kopyalanabilir)" FontWeight="SemiBold"/>
+                    <TextBlock Text="SHA-256" FontWeight="SemiBold"/>
                     <TextBox x:Name="ResultHashText" IsReadOnly="True"
                              PlaceholderText="Dosya özeti burada görünecek."
                              TextWrapping="Wrap"/>
+                    <Button x:Name="CopyHashButton" Content="SHA-256 kopyala"
+                            IsEnabled="False" Click="OnCopyHash"/>
                     <TextBlock Text="Not: SHA-256 değeri bir güvenlik hükmü değildir."
                                Opacity="0.7" TextWrapping="Wrap"/>
                 </StackPanel>
@@ -71,6 +73,8 @@
                                FontSize="20" FontWeight="SemiBold"/>
                     <TextBlock Text="Yalnızca bellekte tutulur; disk üzerinde geçmiş oluşturulmaz."
                                Opacity="0.7" TextWrapping="Wrap"/>
+                    <Button Content="Oturum geçmişini temizle"
+                            HorizontalAlignment="Left" Click="OnClearHistory"/>
                     <ListView x:Name="HistoryList" Height="150"/>
                 </StackPanel>
             </Border>
