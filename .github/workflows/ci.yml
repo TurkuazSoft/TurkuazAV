@@ -56,7 +56,6 @@ jobs:
       - name: Build WinUI desktop
         run: dotnet build src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj --configuration Release --no-restore -p:Platform=x64
       - name: Prepare unsigned Windows test package
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: pwsh
         run: ./tools/package-desktop-preview.ps1
       - name: Upload unsigned Windows test package
