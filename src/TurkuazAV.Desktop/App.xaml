@@ -1,0 +1,21 @@
+<!--
+# 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Desktop/App.xaml
+# 📌 Amac: WinUI uygulamasinin Fluent kaynaklarini tanimlamak
+# 📌 Modul - FileType: XAML
+# Version: 0.3.0
+# Aciklama: WinUI uygulamasinin Fluent kaynaklarini tanimlamak
+# Bagimli Oldugu Katman: View
+-->
+
+<Application
+    x:Class="TurkuazAV.Desktop.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

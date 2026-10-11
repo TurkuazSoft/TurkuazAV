@@ -1,0 +1,26 @@
+<!--
+# 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj
+# 📌 Amac: Windows x64 icin paketlenmemis WinUI 3 test arayuzunu derlemek
+# 📌 Modul - FileType: XML
+# Version: 0.3.0
+# Aciklama: Windows x64 icin paketlenmemis WinUI 3 test arayuzunu derlemek
+# Bagimli Oldugu Katman: View | Controller
+-->
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <ProjectReference Include="../TurkuazAV.Core/TurkuazAV.Core.csproj" />
+  </ItemGroup>
+</Project>

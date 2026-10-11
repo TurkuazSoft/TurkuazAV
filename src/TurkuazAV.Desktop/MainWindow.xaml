@@ -1,0 +1,79 @@
+<!--
+# 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Desktop/MainWindow.xaml
+# 📌 Amac: Dosya secimi, hash raporu ve oturum gecmisini gostermek
+# 📌 Modul - FileType: XAML
+# Version: 0.3.0
+# Aciklama: Dosya secimi, hash raporu ve oturum gecmisini gostermek
+# Bagimli Oldugu Katman: View
+-->
+
+<Window
+    x:Class="TurkuazAV.Desktop.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="TurkuazAV — Deneysel Dosya Analizi">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Padding="32" Spacing="20" MinWidth="650">
+            <StackPanel Spacing="5">
+                <TextBlock Text="TurkuazAV" FontSize="30" FontWeight="SemiBold"/>
+                <TextBlock Text="DOSYA ANALIZI  /  0.3.0 PREVIEW"
+                           FontSize="12" Opacity="0.7"/>
+            </StackPanel>
+
+            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
+                     Title="Deneysel tarayıcı — antivirüs koruması sağlamaz"
+                     Message="Dosyaları yalnızca okuyup SHA-256 özeti hesaplar. Zararlı yazılım tespiti, gerçek zamanlı koruma veya karantina içermez."/>
+
+            <Border Padding="20" CornerRadius="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Dosya seçimi" FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock Text="İncelemek istediğiniz tek bir dosyayı seçin."
+                               TextWrapping="Wrap"/>
+                    <TextBlock x:Name="SelectedFileText" Text="Henüz dosya seçilmedi."
+                               TextWrapping="Wrap" Opacity="0.8"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="SelectButton" Content="Dosya seç"
+                                Click="OnSelectFile"/>
+                        <Button x:Name="ScanButton" Content="SHA-256 tara"
+                                Click="OnScanFile" IsEnabled="False"/>
+                        <Button x:Name="CancelButton" Content="İptal"
+                                Click="OnCancelScan" IsEnabled="False"/>
+                        <ProgressRing x:Name="ActivityRing" Width="26" Height="26"
+                                      IsActive="False"/>
+                    </StackPanel>
+                    <TextBlock x:Name="StatusText" Text="Tarama için dosya bekleniyor."
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border Padding="20" CornerRadius="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Son analiz raporu" FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock Text="Durum" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="ResultStatusText" Text="Rapor yok."/>
+                    <TextBlock Text="Dosya boyutu" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="ResultSizeText" Text="—"/>
+                    <TextBlock Text="SHA-256 (kopyalanabilir)" FontWeight="SemiBold"/>
+                    <TextBox x:Name="ResultHashText" IsReadOnly="True"
+                             PlaceholderText="Dosya özeti burada görünecek."
+                             TextWrapping="Wrap"/>
+                    <TextBlock Text="Not: SHA-256 değeri bir güvenlik hükmü değildir."
+                               Opacity="0.7" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border Padding="20" CornerRadius="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Bu oturumdaki taramalar"
+                               FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock Text="Yalnızca bellekte tutulur; disk üzerinde geçmiş oluşturulmaz."
+                               Opacity="0.7" TextWrapping="Wrap"/>
+                    <ListView x:Name="HistoryList" Height="150"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
