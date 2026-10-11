@@ -1,7 +1,7 @@
 // # 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.IntegrationTests/config/IntegrationSettings.cs
 // # 📌 Amac: Zararsiz orneklerin ve beklenen kural eslesmelerinin ayarlarini tanimlamak
 // # 📌 Modul - FileType: Config - CSharp
-// # Version: 0.2.1
+// # Version: 0.2.2
 // # Aciklama: Zararsiz orneklerin ve beklenen kural eslesmelerinin ayarlarini tanimlamak
 // # Bagimli Oldugu Katman: Config
 
@@ -26,6 +26,9 @@ public static class IntegrationSettings
     public const string PositiveMatchFailure = "Real YARA-X failed to find the harmless marker.";
     public const string NegativeMatchFailure = "Real YARA-X reported a match for a clean sample.";
     public const string InvalidSignatureFailure = "A changed rule was accepted by signature verification.";
+    public const string UntrustedEngineFile = "untrusted-yr.bin";
+    public const string UntrustedEngineContent = "harmless non-engine content";
+    public const string UntrustedEngineAccepted = "Untrusted YARA-X executable was not rejected.";
     public const string TestsPassed = "YARAX_E2E_TESTS_PASSED";
     public const int SigningKeyBits = 2048;
 }

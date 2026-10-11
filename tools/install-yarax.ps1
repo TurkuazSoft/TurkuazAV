@@ -1,7 +1,7 @@
 # 📄 Dosya Yolu: /TurkuazAV/tools/install-yarax.ps1
 # 📌 Amac: Resmi YARA-X paketini SHA256 dogrulayarak CI ortaminda kurmak
 # 📌 Modul - FileType: Tool - PowerShell
-# Version: 0.2.1
+# Version: 0.2.2
 # Aciklama: Resmi YARA-X paketini SHA256 dogrulayarak CI ortaminda kurmak
 # Bagimli Oldugu Katman: Tool | Config
 
@@ -71,4 +71,10 @@ if ($env:GITHUB_ENV) {
     Add-Content -LiteralPath $env:GITHUB_ENV -Value "TURKUAZ_YR_PATH=$($binary.FullName)" -Encoding utf8
 }
 
+$verifiedBinaryHash = (Get-FileHash -LiteralPath $binary.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 Write-Host "YARA-X $($manifest.Version) archive SHA256 verified on $platform."
+$expectedBinaryHash = ([string]$package.BinarySha256).ToLowerInvariant()
+if ($verifiedBinaryHash -cne $expectedBinaryHash) {
+    throw "YARA-X executable SHA256 mismatch for $platform"
+}
+Write-Host "YARAX_VERIFIED_BINARY_SHA256_$platform=$verifiedBinaryHash"

@@ -1,7 +1,7 @@
 // # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Cli/Program.cs
 // # 📌 Amac: Hash ve imzali YARA-X komutlarini Service uzerine baglamak
 // # 📌 Modul - FileType: CSharp
-// # Version: 0.2.0
+// # Version: 0.2.2
 // # Aciklama: Hash ve imzali YARA-X komutlarini Service uzerine baglamak
 // # Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
 
@@ -39,7 +39,8 @@ try
 }
 catch (Exception error) when (error is IOException or UnauthorizedAccessException
     or ArgumentException or CryptographicException or InvalidOperationException
-    or TimeoutException or Win32Exception)
+    or TimeoutException or Win32Exception or InvalidDataException
+    or PlatformNotSupportedException)
 {
     view.ShowError(error.Message);
     return ExitCodes.ScanFailed;

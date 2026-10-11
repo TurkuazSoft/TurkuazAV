@@ -1,7 +1,7 @@
 // # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Core/tools/YaraXCliTool.cs
 // # 📌 Amac: YARA-X CLI motorunu shell kullanmadan sinirli sure ile calistirmak
 // # 📌 Modul - FileType: CSharp
-// # Version: 0.2.0
+// # Version: 0.2.2
 // # Aciklama: YARA-X CLI motorunu shell kullanmadan sinirli sure ile calistirmak
 // # Bagimli Oldugu Katman: Tool | Config | Language
 
@@ -12,12 +12,22 @@ using TurkuazAV.Core.Language;
 namespace TurkuazAV.Core.Tools;
 public sealed class YaraXCliTool : IRuleEngineTool
 {
+    private readonly IEngineIntegrityTool _integrityTool;
+
+    public YaraXCliTool() : this(new Sha256EngineIntegrityTool()) { }
+
+    public YaraXCliTool(IEngineIntegrityTool integrityTool)
+    {
+        _integrityTool = integrityTool ?? throw new ArgumentNullException(nameof(integrityTool));
+    }
+
     public async Task<IReadOnlyList<string>> ScanAsync(string executablePath,
         string verifiedRulePath, string targetPath,
         CancellationToken cancellationToken = default)
     {
         if (!Path.IsPathFullyQualified(executablePath) || !File.Exists(executablePath))
             throw new FileNotFoundException(RuleMessages.EngineNotFound, executablePath);
+        await _integrityTool.VerifyAsync(executablePath, cancellationToken);
         var start = new ProcessStartInfo
         {
             FileName = executablePath,
