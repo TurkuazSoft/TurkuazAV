@@ -1,8 +1,8 @@
 # 📄 Dosya Yolu: /TurkuazAV/.github/workflows/ci.yml
-# 📌 Amac: Windows Linux smoke ve gercek YARA-X E2E testlerini tetiklemek
+# 📌 Amac: Windows Linux motor testleri ve Windows WinUI 3 derleme kontrolu
 # 📌 Modul - FileType: CI - YAML
-# Version: 0.2.1
-# Aciklama: Windows Linux smoke ve gercek YARA-X E2E testlerini tetiklemek
+# Version: 0.3.0
+# Aciklama: GitHub-hosted runner uzerinde WinUI build ve ortak core E2E
 # Bagimli Oldugu Katman: Tool | Config
 
 name: cross-platform-ci
@@ -43,3 +43,26 @@ jobs:
         run: ./tools/install-yarax.ps1
       - name: Real YARA-X end-to-end tests
         run: dotnet run --project tests/TurkuazAV.IntegrationTests --configuration Release --no-restore
+
+  winui-desktop-build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore WinUI desktop
+        run: dotnet restore src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj -p:Platform=x64
+      - name: Build WinUI desktop
+        run: dotnet build src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj --configuration Release --no-restore -p:Platform=x64
+      - name: Prepare unsigned Windows test package
+        shell: pwsh
+        run: ./tools/package-desktop-preview.ps1
+      - name: Upload unsigned Windows test package
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TurkuazAV-0.3.0-UNSIGNED-LOCAL-TEST-win-x64
+          path: artifacts/TurkuazAV-0.3.0-UNSIGNED-LOCAL-TEST-win-x64/
+          if-no-files-found: error
+          retention-days: 7

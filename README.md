@@ -1,34 +1,57 @@
 # 📄 Dosya Yolu: /TurkuazAV/README.md
-# 📌 Amac: Guvenilir kural taramasi entegrasyonunu ve urun sinirlarini belgelemek
+# 📌 Amac: TurkuazAV 0.3.0 GUI ve guvenli tarama test mimarisini tanimlamak
 # 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.2.4
-# Aciklama: Guvenilir kural taramasi entegrasyonunu ve urun sinirlarini belgelemek
+# Version: 0.3.0
+# Aciklama: WinUI 3 preview ile ortak Windows/Linux tarama altyapisi
 # Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
 
 # TurkuazAV
 
-TurkuazAV, Windows ve Linux icin gelistirilen deneysel, salt-okunur
-dosya analiz projesidir. **Uretim antivirus korumasi saglamaz.**
+TurkuazAV, coklu platform icin deneysel dosya analiz ve guvenlik
+altyapisi projesidir. **Bu surum tam bir antivirus degildir.**
 
-## 0.2.4
+## Surum 0.3.0 (Windows WinUI 3 test arayuzu)
 
-- Ortak .NET 10 dosya envanteri / SHA-256 hesaplama
-- YARA-X v1.21.0 Windows x64 / Linux x64 dogrulanmis executable
-- RSA-PSS-SHA256 kaynak kurali dogrulama
-- Onceden guvenilmis yayinci public key listesi (library bootstrap)
-- Imzali ve surumlu manifest, kural SHA-256 denetimi
-- Yeni `TrustedRuleScanService`: **dogrula -> snapshot -> gercek
-  YARA-X taramasi -> basariliysa surum kaydet**
-- Kalici 40-byte anti-rollback state: 8-byte sequence + 32-byte
-  imzali manifest fingerprint. Ayni sequence ile degisik imzali paket
-  reddedilir, daha eski sequence reddedilir.
-- Gercek YARA-X E2E testi: trusted publisher, pozitif/negatif eslesme,
-  sequence conflict, rollback, sahte engine, motor hatasi ve bozulmus kural
-- Windows/Linux CI dogrulamasi (PR ve main)
+Windows uygulamasinda:
+
+- Tek dosya secme: Windows dosya secici
+- Salt okunur SHA-256 hesaplama (varsayilan dosya limiti: 100 MiB)
+- Basarili, atlanan ve hatali tarama raporu
+- Hash degerini kopyalamaya uygun, salt okunur rapor kutusu
+- Iptal destegi ve tarama sirasinda kilitlenen tekrarli butonlar
+- Oturum icinde tarama gecmisi (bellekte, diske kaydedilmez)
+- Acik bir deneysel surum/bagimsiz antivirus uyarisı
+
+Windows arayuzu **yalnizca SHA-256 dosya ozeti** hesaplar.
+YARA-X ve trusted publisher altyapisi 0.2.x serisinde ortak
+Core/CLI uzerinde korunur, GUI'ye henuz acilmamistir.
+SHA-256 ozeti tek basina zararlilik karari vermez.
 
 ## Gelistirme
 
-.NET 10 SDK ile:
+.NET 10 SDK gerekir. Windows GUI projesi icin Windows App SDK 2.5.1
+kullanilir. Proje WinUI 3 ve **unpackaged / self-contained**
+derleme ayarlarina sahiptir. Yalnizca Windows x64 hedeflenir.
+
+```powershell
+dotnet restore src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj -p:Platform=x64
+dotnet build src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj -c Release -p:Platform=x64
+```
+
+Windows'ta olusan TurkuazAV.Desktop.exe uygulamasi ile dosya
+secebilir ve tek dosya taramasi yapabilirsiniz.
+Bu bir *CI derleme dogrulamasi* olup, otomatik GUI calistirma
+ve ekrandan test (UI automation) henuz bulunmamaktadir.
+Windows GUI ilk dogrulamasi GitHub-hosted Windows 2022 runner
+uzerinde; Linux ortak motor CI'si eskisi gibi devam eder.
+
+Basarili `main` CI calismalarinda yalnizca **imzasiz yerel test icin**
+`TurkuazAV-0.3.0-UNSIGNED-LOCAL-TEST-win-x64` adli artifact bulunur.
+Tum klasoru cikartip `TurkuazAV.Desktop.exe` dosyasini calistirin.
+Guncel antivirus uyarisini korumayi devre disi birakarak asmayan;
+uygulamayi test makinasi/izole VM ile sinirlandiran bir yontem izleyin.
+
+## CLI ve guvenlik regresyonlari
 
 ```text
 dotnet run --project src/TurkuazAV.Cli -- scan .
@@ -37,9 +60,8 @@ pwsh ./tools/install-yarax.ps1
 dotnet run --project tests/TurkuazAV.IntegrationTests
 ```
 
-Son entegrasyon testleri icin `TURKUAZ_YR_PATH` degiskeninin resmi,
-dogrulanmis `yr` executable yolunu gostermesi gerekir.
-GitHub CI installer bu degiskeni otomatik doldurur.
+YARA-X entegrasyon testlerinde `TURKUAZ_YR_PATH` dogrulanmis
+`yr` programina yonlendirilmelidir (CI'da installer ayarlar).
 
 Gelistirici CLI komutu:
 
@@ -47,35 +69,23 @@ Gelistirici CLI komutu:
 dotnet run --project src/TurkuazAV.Cli -- scan-rules TARGET RULES.YAR RULES.SIG PUBLIC.PEM ABSOLUTE_YR_PATH
 ```
 
-Bu **gelistirici komutunda** acik anahtar kullanicidan alindigi icin
-yayinci guven kokeni bulunmuyor. CLI uretim taramasi gibi
-kullanilmamalidir.
+Bu komutun kullanicidan kabul ettigi public key bir uretim
+yayinci guven koku degildir; sadece gelistirme amaclidir.
+Publisher-pinned trusted rule scanner su anda sadece Core
+kutuphane API'sinde ve Windows/Linux E2E regresyonlarinda
+kullanilmaktadir.
 
-**Yeni guvenilir yayinci akisi `TrustedRuleScanService`
-kutuphane API'sine baglandi ve gercek YARA-X ile test edilir.**
-Genel CLI komutu uretim trust store ile henuz baglanmadi: guvenilir
-publisher public key'i/provisioning su anda bulunmuyor. Bu nedenle
-uretim seviyesi `scan-trusted` komutu acilmadi.
+## Guvenlik sinirlari
 
-## State migration
+- Henuz gercek zamanli koruma, karantina, driver veya AV verdict yok.
+- Program dosya icerigini silmez/degistirmez; sadece salt-okunur acar.
+- Yeni GUI'de YARA-X motora erisim verilmez: hash raporu uretilir.
+- SHA-256 sonucunun temiz olmasi otomatik olarak guvenilir demek degildir.
+- Dosya taranirken disk icerigi degisebilir.
+- Windows test arayuzu Linux/macOS ile ayni UI degildir;
+  ortak Core degismez. MacOS icin runner henuz yoktur.
+- Public repo icin kaynak kod lisansi henuz secilmemistir.
 
-0.2.3'un 8-byte sequence dosyasi, 0.2.4'un sequence + manifest
-fingerprint bicimine **otomatik donusturulmez**. Eski veya bozuk state
-guvenli sekilde reddedilir. Uretim guncelleyici ayri, dogrulanabilir
-bir migrasyon akisi saglamadan eski state'i silip yeniden baslatmayin.
+Mimari: Controller -> Service -> Repo/Tool -> View -> Language + Config.
 
-## Bilinen riskler
-
-- Yerel state dosyasinin silinmesi/geri yuklenmesi, privileged saldirgan
-  ve guvensiz dizin ACL durumlarinda engellenmez.
-- Ayni sequence icin imza farkli olsa da imzali manifest icerigi
-  ayniysa (key ID dahil) kabul edilir.
-- Guvenilen anahtarlar uygulamaya haricen onayli bootstrap ile
-  alinmalidir; test anahtarlari her testte gecici uretilir.
-- Tarama motoru hash dogrulamasi sonrasi Process.Start TOCTOU ve
-  sandbox eksigi devam ediyor.
-- File snapshot olusturma sirasinda eszamanli degisiklik riski var.
-- macOS CI, WinUI GUI, karantina ve gercek zamanli koruma yok.
-- Public repo kaynak lisansi henuz secilmedi.
-
-Ek bilgi: [Security model](docs/security-model.md).
+[Guvenlik modeli](docs/security-model.md).

@@ -1,16 +1,16 @@
 <!--
 # 📄 Dosya Yolu: /TurkuazAV/Directory.Build.props
-# 📌 Amac: Ortak TurkuazAV surumunu 0.2.4 olarak guncellemek
-# 📌 Modul - FileType: Config - XML
-# Version: 0.2.4
-# Aciklama: Ortak TurkuazAV surumunu 0.2.4 olarak guncellemek
+# 📌 Amac: Uygulama surumunu 0.3.0 yapmak
+# 📌 Modul - FileType: XML
+# Version: 0.3.0
+# Aciklama: Uygulama surumunu 0.3.0 yapmak
 # Bagimli Oldugu Katman: Config
 -->
 
 <Project>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>0.2.4</Version>
+    <Version>0.3.0</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
