@@ -1,0 +1,17 @@
+<!--
+# 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.IntegrationTests/TurkuazAV.IntegrationTests.csproj
+# 📌 Amac: Gercek YARA-X entegrasyon test uygulamasini derlemek
+# 📌 Modul - FileType: Tests - XML
+# Version: 0.2.1
+# Aciklama: Gercek YARA-X entegrasyon test uygulamasini derlemek
+# Bagimli Oldugu Katman: Service | Repo | Tool
+-->
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/TurkuazAV.Core/TurkuazAV.Core.csproj" />
+  </ItemGroup>
+</Project>

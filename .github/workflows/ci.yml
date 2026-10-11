@@ -1,9 +1,9 @@
 # 📄 Dosya Yolu: /TurkuazAV/.github/workflows/ci.yml
-# 📌 Amac: Windows ve Linux icin derleme ve smoke testlerini calistirmak
+# 📌 Amac: Windows Linux smoke ve gercek YARA-X E2E testlerini tetiklemek
 # 📌 Modul - FileType: CI - YAML
-# Version: 0.1.0
-# Aciklama: Windows ve Linux icin derleme ve smoke testlerini calistirmak
-# Bagimli Oldugu Katman: Tool
+# Version: 0.2.1
+# Aciklama: Windows Linux smoke ve gercek YARA-X E2E testlerini tetiklemek
+# Bagimli Oldugu Katman: Tool | Config
 
 name: cross-platform-ci
 
@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  smoke:
+  smoke-and-yarax-e2e:
     strategy:
       fail-fast: false
       matrix:
@@ -32,7 +32,14 @@ jobs:
         run: dotnet restore src/TurkuazAV.Cli/TurkuazAV.Cli.csproj
       - name: Restore smoke tests
         run: dotnet restore tests/TurkuazAV.SmokeTests/TurkuazAV.SmokeTests.csproj
+      - name: Restore integration tests
+        run: dotnet restore tests/TurkuazAV.IntegrationTests/TurkuazAV.IntegrationTests.csproj
       - name: Build CLI
         run: dotnet build src/TurkuazAV.Cli/TurkuazAV.Cli.csproj --configuration Release --no-restore
       - name: Run smoke tests
-        run: dotnet run --project tests/TurkuazAV.SmokeTests/TurkuazAV.SmokeTests.csproj --configuration Release --no-restore
+        run: dotnet run --project tests/TurkuazAV.SmokeTests --configuration Release --no-restore
+      - name: Verify and extract official YARA-X
+        shell: pwsh
+        run: ./tools/install-yarax.ps1
+      - name: Real YARA-X end-to-end tests
+        run: dotnet run --project tests/TurkuazAV.IntegrationTests --configuration Release --no-restore

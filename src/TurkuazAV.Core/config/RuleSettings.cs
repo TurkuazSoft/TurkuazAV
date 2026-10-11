@@ -1,11 +1,12 @@
 // # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Core/config/RuleSettings.cs
-// # 📌 Amac: Kural taramasinda kullanilan limit ve sabitleri yonetmek
-// # 📌 Modul - FileType: CSharp
-// # Version: 0.2.0
-// # Aciklama: Kural taramasinda kullanilan limit ve sabitleri yonetmek
+// # 📌 Amac: Tarama limitlerini, sureleri ve temp snapshot adlarini tutmak
+// # 📌 Modul - FileType: Config - CSharp
+// # Version: 0.2.1
+// # Aciklama: Tarama limitlerini, sureleri ve temp snapshot adlarini tutmak
 // # Bagimli Oldugu Katman: Config
 
 namespace TurkuazAV.Core.Config;
+
 public static class RuleSettings
 {
     public const int MaxRuleBytes = 524288;
@@ -17,6 +18,7 @@ public static class RuleSettings
     public const int TimeoutSeconds = 30;
     public const string TempPrefix = "TurkuazAV-Rules-";
     public const string VerifiedRuleName = "verified.yar";
+    public const string TargetSnapshotName = "target.snapshot";
     public const string YrScanVerb = "scan";
     public const string YrJsonOption = "--output-format=ndjson";
     public const string JsonPath = "path";
