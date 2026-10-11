@@ -73,4 +73,8 @@ if ($env:GITHUB_ENV) {
 
 $verifiedBinaryHash = (Get-FileHash -LiteralPath $binary.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 Write-Host "YARA-X $($manifest.Version) archive SHA256 verified on $platform."
+$expectedBinaryHash = ([string]$package.BinarySha256).ToLowerInvariant()
+if ($verifiedBinaryHash -cne $expectedBinaryHash) {
+    throw "YARA-X executable SHA256 mismatch for $platform"
+}
 Write-Host "YARAX_VERIFIED_BINARY_SHA256_$platform=$verifiedBinaryHash"

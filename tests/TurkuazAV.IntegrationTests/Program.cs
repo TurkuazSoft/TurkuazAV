@@ -1,13 +1,14 @@
 // # 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.IntegrationTests/Program.cs
 // # 📌 Amac: Gercek YARA-X ile pozitif negatif ve bozuk imza akisini dogrulamak
 // # 📌 Modul - FileType: Tests - CSharp
-// # Version: 0.2.1
+// # Version: 0.2.2
 // # Aciklama: Gercek YARA-X ile pozitif negatif ve bozuk imza akisini dogrulamak
 // # Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
 using System.Security.Cryptography;
 using System.Text;
 using TurkuazAV.Core.Repositories;
+using TurkuazAV.Core.Language;
 using TurkuazAV.Core.Services;
 using TurkuazAV.Core.Tools;
 using TurkuazAV.IntegrationTests.Config;
@@ -72,6 +73,26 @@ try
 
     if (!signatureRejected)
         throw new InvalidOperationException(IntegrationSettings.InvalidSignatureFailure);
+
+    // Restore the original, valid signed rule before checking the engine hash.
+    await File.WriteAllBytesAsync(rulePath, ruleData);
+    var untrustedEngine = Path.Combine(tempRoot, IntegrationSettings.UntrustedEngineFile);
+    await File.WriteAllTextAsync(untrustedEngine, IntegrationSettings.UntrustedEngineContent);
+
+    var untrustedRejected = false;
+    try
+    {
+        await service.ScanAsync(
+            positivePath, rulePath, signaturePath, keyPath, untrustedEngine);
+    }
+    catch (InvalidDataException error) when (
+        error.Message == RuleMessages.EngineDigestMismatch)
+    {
+        untrustedRejected = true;
+    }
+
+    if (!untrustedRejected)
+        throw new InvalidOperationException(IntegrationSettings.UntrustedEngineAccepted);
 
     Console.WriteLine(IntegrationSettings.TestsPassed);
     return 0;

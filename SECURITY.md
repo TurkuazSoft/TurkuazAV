@@ -1,19 +1,25 @@
 # 📄 Dosya Yolu: /TurkuazAV/SECURITY.md
-# 📌 Amac: Guvenlik acigi bildirimleri ve test guvenligini tanimlamak
+# 📌 Amac: Acik bildirim politikasini ve guvenli test kurallarini tanimlamak
 # 📌 Modul - FileType: Security - Markdown
-# Version: 0.1.0
-# Aciklama: Guvenlik acigi bildirimleri ve test guvenligini tanimlamak
+# Version: 0.2.2
+# Aciklama: Guvenlik bildirimi ve beta koruma sinirlari
 # Bagimli Oldugu Katman: Service | Tool
 
-# Guvenlik politikasi
+# Security Policy
 
-TurkuazAV 0.1.0 yalnizca deneysel salt-okunur dosya envanteri aracidir.
-Antivirus, EDR veya ransomware engelleme urunu olarak kullanilmamalidir.
+TurkuazAV 0.2.2 deneysel dosya analiz aracidir. Cihazi koruyan
+antivirus, EDR veya ransomware engelleme yazilimi olarak
+kullanilmamalidir.
 
-Guvenlik aciklarini public issue uzerinden yayinlamayin. GitHub'in
-private vulnerability reporting ozelligi etkinse bu kanali kullanin.
-Etkin degilse hassas teknik ayrintilari acik issue veya PR ile paylasmayin.
+Acik ayrintilarini public issue veya PR ile yayinlamayin.
+GitHub private vulnerability reporting etkinse o kanali tercih edin.
+Henuz etkin degilse hassas istismar ayrintilarini acik depoya yazmayin.
 
-Gercek zararli dosyalari repoya eklemeyin. Testlerde temiz ornekler ve
-zararsiz deneme verileri kullanin. Otomatik silme ve surec sonlandirma
-mekanizmalari ilk surumde bulunmaz.
+Testlerde gercek zararli dosyalari depoya, CI artifactlerine veya
+test loglarina eklemeyin. Zararsiz ornek dosyalar kullanin.
+
+Ileri asamalarda dosya silme, karantina ve surec sonlandirma
+eklenmeden once rollback ve yanlis pozitif prosedurleri
+ayrica denetlenmelidir.
+
+Guven modeli: [docs/security-model.md](docs/security-model.md).
