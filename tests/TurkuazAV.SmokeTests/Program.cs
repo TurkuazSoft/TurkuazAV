@@ -1,7 +1,7 @@
 // # 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.SmokeTests/Program.cs
 // # 📌 Amac: Hash testleri ile imza dogrulama testlerini birlikte calistirmak
 // # 📌 Modul - FileType: CSharp
-// # Version: 0.2.0
+// # Version: 0.2.3
 // # Aciklama: Hash testleri ile imza dogrulama testlerini birlikte calistirmak
 // # Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
@@ -51,6 +51,7 @@ try
         throw new InvalidOperationException(TestSettings.Failed);
 
     await RuleSignatureSmoke.RunAsync(root);
+    await TrustedRulePackageSmoke.RunAsync(root);
 
     Console.WriteLine(TestSettings.Passed);
     return 0;

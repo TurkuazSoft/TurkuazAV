@@ -1,51 +1,55 @@
 # 📄 Dosya Yolu: /TurkuazAV/docs/security-model.md
-# 📌 Amac: Motor ve kural imzasi guven modelini netlestirmek
+# 📌 Amac: Guven koku, yayinci rotasyonu ve rollback risklerini aciklamak
 # 📌 Modul - FileType: Security - Markdown
-# Version: 0.2.2
-# Aciklama: Tehdit modeli ve kalan guvenlik riskleri
+# Version: 0.2.3
+# Aciklama: Imzali kurallarin kaynak ve surum guvenligi
 # Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
-# Guvenlik modeli (deneysel)
+# TurkuazAV 0.2.3 guven modeli
 
-## Korunan varliklar
+## Mevcut dogrulama modeli
 
-- YARA-X tarama motorunun dogrulanmis binary dosyasi
-- Imzali kaynak YARA kural baytlari
-- Taranacak kullanici dosyalari (salt okunur)
-- Raporlama sonuclari
+1. CI resmi YARA-X 1.21.0 arsiv SHA-256 ozetini dogrular.
+2. Tarama motoru ikilisi calistirilmadan once bilinen SHA-256 ile karsilastirilir.
+3. Guvenilir publisher trust store, **uygulamaya ait guvenilir bootstrap**
+   tarafindan onceden verilen key ID -> PEM eslemesini barindirir.
+4. `TrustedRulePackageService` manifest JSON alanlarini katilikla ayrisir.
+5. Imza, `TurkuazAV.rule-package.v1\n` domain separator ve
+   sequence/key ID/digest degerlerini kapsayan kanonik baytlara aittir.
+6. RSA-PSS-SHA256 dogrulamasindan sonra kural SHA-256 ozeti karsilastirilir.
+7. `LocalRuleVersionRepository` en yuksek kabul edilen sequence degerini
+   saklar; eski imzali paketleri reddeder.
 
-## Dogrulama zinciri
+## Anahtar rotasyonu
 
-1. CI installer resmi v1.21.0 paketini indirir.
-2. Resmi release icin sabitlenmis arsiv SHA-256 ile kontrol eder.
-3. Arsivden cikan `yr` dosyasi ikinci SHA-256 pinine gore kontrol edilir.
-4. Her taramada Tool katmani motor binary SHA-256 degerini yeniden hesaplar.
-5. Repository, kural dosyasini boyut sinirli olarak okur.
-6. Service RSA-PSS-SHA256 imzasini kullanici secimli PEM ile dogrular.
-7. Dogrulanan kurallar ve boyut sinirli target snapshot ile analiz yapilir.
+Guvenilen politika iki *onceden onayli* yayinci acik anahtarini
+gecici olarak ayni anda kabul edebilir. Yeni anahtarla yuksek
+sequence paketi kabul edildikten sonra eski public key yayin
+politikasindan cikarilabilir. Key ID paketin icinde imza kapsamina
+alindigindan paket kendi key ID degerini degistiremez.
 
-## Guven konusu
+0.2.3'te **hicbir gercek uretim yayinci key'i yer almiyor**.
+Testler anlik RSA test anahtarlari ile kosuyor.
+Ozel anahtari source control, log veya public CI icine koymayin.
 
-0.2.2 uretim icin gereken *pinned publisher rule key* icermez.
-Testte kullanilan anahtar CI icinde gecici uretilir.
-Bu nedenle kullanicinin kendi anahtarini ve kurallarini imzalamasi
-guvenilir yayinci tespiti olarak yorumlanamaz.
+## Rollback sinirlari
 
-Motor SHA-256 pinleme yalnizca bilinen release dosyasinin degismedigini
-kontrol eder; tek basina kod imzasi veya malware davranis izolasyonu degildir.
-Dosya konumu hash kontrolunden sonra degistirilebildigi icin kucuk
-bir execution TOCTOU penceresi vardir.
+State dosyasi yerel diskte ve korunmus ACL altinda bulunmalidir.
+Basarili imza dogrulamasi sonrasi sequence diske kaydedilir.
+Daha dusuk sequence reddedilir; ayni sequence yeniden kabul edilir.
+State bozulursa fail closed.
 
-## Platformlar
+Bu mekanizma privileged local attacker tarafindan state dosyasinin
+silinmesi, snapshot rollback veya tum state dizininin degismesi
+riskine karsi tek basina guvenli degildir. Uretimde Windows service
+ACL, policy sunucusu, cihaz kaydi ve gerekirse OS protected storage
+ile daha guclu monotonicity gerekir.
 
-Windows x64 ve Linux x64: onayli binary digest profilleri.
-macOS/ARM: guvenilen profil tanimli degil, fail closed.
+## Uretime cikmadan once
 
-## Ertelenen kontroller
-
-- Guvenilir yayinci RSA acik anahtari / rotasyon / key ID
-- Kurallar icin rollback ve monotonic version policy
-- Motor binary calistirma sandbox ve yetki sinirlamasi
-- Source snapshot eszamanli degisim algilama
-- Kotu niyetli dosyalarla izole fuzz / regresyon
-- Windows Security Center entegrasyonu ve gercek zamanli koruma
+- TrustedRulePackageService dogrulamasini gercek CLI ve updater'a baglamak
+- Trust root provisioning ile key revocation politikasini imzalamak
+- Paketlerin anti-rollback state dosyalarina ACL ve cross-process davranis testleri
+- Yapilandirilmis manifest fuzz ve property tests
+- Kural dosyasinin parser ve motor izolasyonu
+- Kullanici dosyasi snapshot ve Process.Start TOCTOU sertlestirmesi
