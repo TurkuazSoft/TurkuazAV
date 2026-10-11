@@ -1,55 +1,46 @@
 # 📄 Dosya Yolu: /TurkuazAV/docs/security-model.md
-# 📌 Amac: Guven koku, yayinci rotasyonu ve rollback risklerini aciklamak
+# 📌 Amac: Guvenilir imzali paketlerin gercek tarama akisindaki guvenlik kurallarini belgelemek
 # 📌 Modul - FileType: Security - Markdown
-# Version: 0.2.3
-# Aciklama: Imzali kurallarin kaynak ve surum guvenligi
+# Version: 0.2.4
+# Aciklama: Guvenilir imzali paketlerin gercek tarama akisindaki guvenlik kurallarini belgelemek
 # Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
-# TurkuazAV 0.2.3 guven modeli
+# TurkuazAV 0.2.4 Security Model
 
-## Mevcut dogrulama modeli
+## Uretim guven sorumluluklari
 
-1. CI resmi YARA-X 1.21.0 arsiv SHA-256 ozetini dogrular.
-2. Tarama motoru ikilisi calistirilmadan once bilinen SHA-256 ile karsilastirilir.
-3. Guvenilir publisher trust store, **uygulamaya ait guvenilir bootstrap**
-   tarafindan onceden verilen key ID -> PEM eslemesini barindirir.
-4. `TrustedRulePackageService` manifest JSON alanlarini katilikla ayrisir.
-5. Imza, `TurkuazAV.rule-package.v1\n` domain separator ve
-   sequence/key ID/digest degerlerini kapsayan kanonik baytlara aittir.
-6. RSA-PSS-SHA256 dogrulamasindan sonra kural SHA-256 ozeti karsilastirilir.
-7. `LocalRuleVersionRepository` en yuksek kabul edilen sequence degerini
-   saklar; eski imzali paketleri reddeder.
+1. Yayinci keyring, imzali installer veya guvenilir uygulama
+   bootstrap tarafindan secilir. CLI dosya yolu guven koku degildir.
+2. Manifest `schema`, `sequence`, `keyId`, `rulesSha256` alanlari
+   katilikla ayrisir; RSA-PSS-SHA256 imzasi kanonik payload icindir.
+3. Anahtar key ID yalnizca keyring'de mevcutsa dogrulama yapilir.
+4. Kural dosyasi, manifestteki digest ile karsilastirilir.
+5. Dogrulanan kurallar ve dosya hedef snapshot ile gercek YARA-X
+   motorunda taranir; motor executable digest profili sabitlenmistir.
+6. Yalnizca engine taramasi basarili olursa sequence +
+   signed-manifest fingerprint kalici state'e islenir.
+7. Eski sequence ve ayni sequence ile farkli imzali manifest reddedilir.
+   Aynı manifest farkli hedef dosyalarla tekrar kullanilabilir.
 
-## Anahtar rotasyonu
+## Durum dosyasi
 
-Guvenilen politika iki *onceden onayli* yayinci acik anahtarini
-gecici olarak ayni anda kabul edebilir. Yeni anahtarla yuksek
-sequence paketi kabul edildikten sonra eski public key yayin
-politikasindan cikarilabilir. Key ID paketin icinde imza kapsamina
-alindigindan paket kendi key ID degerini degistiremez.
+0.2.4 dosya bicimi: little-endian Int64 sequence (8 byte) ve
+SHA256(signature-domain + canonical manifest) fingerprint (32 byte).
+Tam 40 byte olmayan state veya 0/negatif sequence fail closed.
+0.2.3 8-byte state otomatik olarak silinmez veya migrate edilmez.
 
-0.2.3'te **hicbir gercek uretim yayinci key'i yer almiyor**.
-Testler anlik RSA test anahtarlari ile kosuyor.
-Ozel anahtari source control, log veya public CI icine koymayin.
+Disk durumunu sadece servis hesabinin yazabildigi dizinde tutun.
+`FileShare.None` ayni dosya uzerindeki eszamanli islemleri engeller;
+privileged yerel saldirgan, dosya silme ya da snapshot geri alma
+riskini tek basina engellemez.
 
-## Rollback sinirlari
+## Henuz tamamlanmadi
 
-State dosyasi yerel diskte ve korunmus ACL altinda bulunmalidir.
-Basarili imza dogrulamasi sonrasi sequence diske kaydedilir.
-Daha dusuk sequence reddedilir; ayni sequence yeniden kabul edilir.
-State bozulursa fail closed.
+- Uretim yayinci trust root'u ve imzali rotasyon dagitimi
+- CLI/GUI icin uretim politikasi ve protected-service provisioning
+- YARA-X motor calistirma sandbox, hash-ile-execute TOCTOU sertlestirmesi
+- Paketlerin guvenli yukleme atomikligi, disk power-loss testleri
+- Kural performansi ve fuzz testleri
+- Windows GUI, macOS testleri, karantina ve real-time koruma
 
-Bu mekanizma privileged local attacker tarafindan state dosyasinin
-silinmesi, snapshot rollback veya tum state dizininin degismesi
-riskine karsi tek basina guvenli degildir. Uretimde Windows service
-ACL, policy sunucusu, cihaz kaydi ve gerekirse OS protected storage
-ile daha guclu monotonicity gerekir.
-
-## Uretime cikmadan once
-
-- TrustedRulePackageService dogrulamasini gercek CLI ve updater'a baglamak
-- Trust root provisioning ile key revocation politikasini imzalamak
-- Paketlerin anti-rollback state dosyalarina ACL ve cross-process davranis testleri
-- Yapilandirilmis manifest fuzz ve property tests
-- Kural dosyasinin parser ve motor izolasyonu
-- Kullanici dosyasi snapshot ve Process.Start TOCTOU sertlestirmesi
+Bu kod bir antivirus'un tespit veya engelleme etkinligini kanitlamaz.

@@ -1,7 +1,7 @@
 // # 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.SmokeTests/services/TrustedRulePackageSmoke.cs
 // # 📌 Amac: Publisher pinleme anahtar rotasyonu ve surum geri donusunu test etmek
 // # 📌 Modul - FileType: Tests - CSharp
-// # Version: 0.2.3
+// # Version: 0.2.4
 // # Aciklama: Publisher pinleme anahtar rotasyonu ve surum geri donusunu test etmek
 // # Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
@@ -106,6 +106,13 @@ public static class TrustedRulePackageSmoke
         await File.WriteAllTextAsync(rulesFile, TrustedRuleTestSettings.AlteredRules);
         await MustReject(async () => { await Accept(service); },
             TrustedRuleMessages.BadRuleHash, TrustedRuleTestSettings.AlteredRulesAccepted);
+
+        // A newly signed package cannot reuse an already accepted sequence for
+        // different content, even when both packages use a trusted signing key.
+        await WritePackage(TrustedRuleTestSettings.InitialSequence,
+            TrustedRuleTestSettings.KeyA, firstKey, TrustedRuleTestSettings.RuleB);
+        await MustReject(async () => { await Accept(service); },
+            TrustedRuleMessages.SequenceConflict, TrustedRuleTestSettings.SequenceConflictAccepted);
 
         // Signature must bind the key id, sequence, and rule digest.
         await WritePackage(TrustedRuleTestSettings.RevokedSequence,

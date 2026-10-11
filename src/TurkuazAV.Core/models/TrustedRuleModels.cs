@@ -1,8 +1,8 @@
 // # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Core/models/TrustedRuleModels.cs
-// # 📌 Amac: Imzali kural manifesti, paket ve kabul edilen sonucu tanimlamak
+// # 📌 Amac: Imzali kural paketinin dogrulanmis manifest parmak izini tasimak
 // # 📌 Modul - FileType: CSharp
-// # Version: 0.2.3
-// # Aciklama: Imzali kural manifesti, paket ve kabul edilen sonucu tanimlamak
+// # Version: 0.2.4
+// # Aciklama: Imzali kural paketinin dogrulanmis manifest parmak izini tasimak
 // # Bagimli Oldugu Katman: Service | Repo | Tool
 
 namespace TurkuazAV.Core.Models;
@@ -21,4 +21,5 @@ public sealed record SignedRulePackage(
 public sealed record VerifiedRulePackage(
     long Sequence,
     string PublisherKeyId,
-    byte[] VerifiedRules);
+    byte[] VerifiedRules,
+    string ManifestFingerprint);

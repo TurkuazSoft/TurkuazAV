@@ -1,33 +1,34 @@
 # 📄 Dosya Yolu: /TurkuazAV/README.md
-# 📌 Amac: TurkuazAV 0.2.3 ozelliklerini ve sinirlarini aciklamak
+# 📌 Amac: Guvenilir kural taramasi entegrasyonunu ve urun sinirlarini belgelemek
 # 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.2.3
-# Aciklama: Deneysel tarama motoru ve imzali yayinci paket guven modeli
+# Version: 0.2.4
+# Aciklama: Guvenilir kural taramasi entegrasyonunu ve urun sinirlarini belgelemek
 # Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
 
 # TurkuazAV
 
-TurkuazAV, Windows/Linux icin gelistirilen deneysel ve salt-okunur
-dosya analiz altyapisidir. **Tam korumali antivirus degildir.**
+TurkuazAV, Windows ve Linux icin gelistirilen deneysel, salt-okunur
+dosya analiz projesidir. **Uretim antivirus korumasi saglamaz.**
 
-## 0.2.3 durumu
+## 0.2.4
 
-- .NET 10 ile salt-okunur SHA-256 dosya envanteri
-- Gercek YARA-X v1.21.0 motoru: Windows x64 ve Linux x64
-- Sabitlenmis resmi motor SHA-256 profilleri
-- Gelistirme/test modunda kullanici secimli RSA-PSS imzali kural taramasi
-- **Yeni:** Yayinci anahtarlarini uygulamadan bagimsiz dogrulanmis
-  konfigurasyondan alan `TrustedRuleKeyring` API'si
-- **Yeni:** Surum numarasi, imzalayan key ID ve kural SHA-256
-  ozeti iceren imzali manifest modeli
-- **Yeni:** Kalici en yuksek paket surumu ve eski surum reddi
-- **Yeni:** Izin verilen anahtar listesinin guncellenmesiyle rotasyon/revocation
-- Windows/Linux smoke testlerinde bozuk imza, degistirilen kurallar,
-  taninmayan anahtar, rollback ve bozuk state senaryolari
+- Ortak .NET 10 dosya envanteri / SHA-256 hesaplama
+- YARA-X v1.21.0 Windows x64 / Linux x64 dogrulanmis executable
+- RSA-PSS-SHA256 kaynak kurali dogrulama
+- Onceden guvenilmis yayinci public key listesi (library bootstrap)
+- Imzali ve surumlu manifest, kural SHA-256 denetimi
+- Yeni `TrustedRuleScanService`: **dogrula -> snapshot -> gercek
+  YARA-X taramasi -> basariliysa surum kaydet**
+- Kalici 40-byte anti-rollback state: 8-byte sequence + 32-byte
+  imzali manifest fingerprint. Ayni sequence ile degisik imzali paket
+  reddedilir, daha eski sequence reddedilir.
+- Gercek YARA-X E2E testi: trusted publisher, pozitif/negatif eslesme,
+  sequence conflict, rollback, sahte engine, motor hatasi ve bozulmus kural
+- Windows/Linux CI dogrulamasi (PR ve main)
 
-## Yerel gelistirme
+## Gelistirme
 
-.NET 10 SDK gerekir. YARA-X CLI dogrulanmis resmi surumden kurulur.
+.NET 10 SDK ile:
 
 ```text
 dotnet run --project src/TurkuazAV.Cli -- scan .
@@ -36,50 +37,45 @@ pwsh ./tools/install-yarax.ps1
 dotnet run --project tests/TurkuazAV.IntegrationTests
 ```
 
-CI, `TURKUAZ_YR_PATH` ortam degiskenini ayarlar.
-Yerel E2E testte bu degiskeni resmi `yr` programinin
-mutlak yoluna ayarlamak gerekir.
+Son entegrasyon testleri icin `TURKUAZ_YR_PATH` degiskeninin resmi,
+dogrulanmis `yr` executable yolunu gostermesi gerekir.
+GitHub CI installer bu degiskeni otomatik doldurur.
 
-**Gelistirme modu komutu:**
+Gelistirici CLI komutu:
 
 ```text
 dotnet run --project src/TurkuazAV.Cli -- scan-rules TARGET RULES.YAR RULES.SIG PUBLIC.PEM ABSOLUTE_YR_PATH
 ```
 
-Bu komut kullanicidan public key aldigi icin **guvenilir yayinci
-dogrulamasi yapmaz**. Ileride uretim modunda kaldirilacak veya
-sadece yetkili gelistirici ortaminda kalacaktir.
+Bu **gelistirici komutunda** acik anahtar kullanicidan alindigi icin
+yayinci guven kokeni bulunmuyor. CLI uretim taramasi gibi
+kullanilmamalidir.
 
-## Imzali manifest (yeni kutuphane API'si)
+**Yeni guvenilir yayinci akisi `TrustedRuleScanService`
+kutuphane API'sine baglandi ve gercek YARA-X ile test edilir.**
+Genel CLI komutu uretim trust store ile henuz baglanmadi: guvenilir
+publisher public key'i/provisioning su anda bulunmuyor. Bu nedenle
+uretim seviyesi `scan-trusted` komutu acilmadi.
 
-`TrustedRulePackageService`, `TrustedRuleKeyring` ve
-`LocalRuleVersionRepository` 0.2.3'te eklendi. Manifeste ait
-JSON alanlari `schema`, `sequence`, `keyId`, `rulesSha256`.
-Ilgili RSA-PSS-SHA256 imzasi, `TrustedRuleManifestCodec.SignaturePayload`
-kanonik baytlari uzerinden uretilir.
+## State migration
 
-Yayinci anahtarlari **yalnizca guvenilir uygulama bootstrap
-katmanindan** saglanmali; indirilen manifestten veya kullanicidan
-alinan key ile guven kokeni olusturulmamalidir. Iki onayli anahtari
-bir sure birlikte tanitmak rotasyona imkan verir; eski anahtar
-keyring'den cikarilarak iptal edilir.
+0.2.3'un 8-byte sequence dosyasi, 0.2.4'un sequence + manifest
+fingerprint bicimine **otomatik donusturulmez**. Eski veya bozuk state
+guvenli sekilde reddedilir. Uretim guncelleyici ayri, dogrulanabilir
+bir migrasyon akisi saglamadan eski state'i silip yeniden baslatmayin.
 
-**Onemli sinir:** Bu altyapi 0.2.3'te kutuphane API'si olarak sunulur.
-Henuz TurkuazAV CLI kural tarama akisi ile baglanmamistir.
-Gercek yayinlayici public key'i henuz olusturulup pinlenmedi;
-smoke test anahtarlari yalnizca test sirasinda gecici uretilir.
+## Bilinen riskler
 
-## Guvenlik sinirlari
+- Yerel state dosyasinin silinmesi/geri yuklenmesi, privileged saldirgan
+  ve guvensiz dizin ACL durumlarinda engellenmez.
+- Ayni sequence icin imza farkli olsa da imzali manifest icerigi
+  ayniysa (key ID dahil) kabul edilir.
+- Guvenilen anahtarlar uygulamaya haricen onayli bootstrap ile
+  alinmalidir; test anahtarlari her testte gecici uretilir.
+- Tarama motoru hash dogrulamasi sonrasi Process.Start TOCTOU ve
+  sandbox eksigi devam ediyor.
+- File snapshot olusturma sirasinda eszamanli degisiklik riski var.
+- macOS CI, WinUI GUI, karantina ve gercek zamanli koruma yok.
+- Public repo kaynak lisansi henuz secilmedi.
 
-- Local anti-rollback state dosyasi onayli, servis hesabiyla korunan
-  bir dizinde tutulmalidir. Dosyanin silinmesi veya sistemin
-  eski yedekten donmesi karsisinda tek basina yeterli degildir.
-- Version state'i ayni anda acan baska islem olursa islem
-  guvenli tarafta hata verir; fail closed.
-- RSA anahtar rotasyonu su an sadece API ile; otomatik imzali
-  policy guncelleme protokolu yoktur.
-- YARA-X binary hash kontrolu ile Process.Start arasinda kucuk
-  bir TOCTOU penceresi bulunur. Izole sandbox mevcut degildir.
-- MacOS destegi ve WinUI arayuzu henuz tamamlanmamistir.
-- Karantina, gercek zamanli koruma ve zararlilik karari yoktur.
-- Public repo icin dagitim lisansi secilmemistir.
+Ek bilgi: [Security model](docs/security-model.md).
