@@ -1,8 +1,8 @@
 // # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Desktop/language/DesktopMessages.cs
-// # 📌 Amac: Windows test arayuzunun durum ve hata metinlerini tutmak
+// # 📌 Amac: Kullaniciya gosterilen bilgi, kopyalama ve gecmis metinlerini saklamak
 // # 📌 Modul - FileType: CSharp
-// # Version: 0.3.0
-// # Aciklama: Windows test arayuzunun durum ve hata metinlerini tutmak
+// # Version: 0.3.1
+// # Aciklama: Kullaniciya gosterilen bilgi, kopyalama ve gecmis metinlerini saklamak
 // # Bagimli Oldugu Katman: Language
 
 namespace TurkuazAV.Desktop.Language;
@@ -24,4 +24,8 @@ public static class DesktopMessages
     public const string UnknownSize = "—";
     public const string ByteUnit = " bayt";
     public const string HistorySeparator = " | ";
+    public const string Copied = "SHA-256 panoya kopyalandı.";
+    public const string CopyFailed = "Kopyalama başarısız: ";
+    public const string HistoryCleared = "Oturum geçmişi temizlendi.";
+    public const string NoResult = "Rapor yok.";
 }

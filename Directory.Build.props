@@ -1,16 +1,16 @@
 <!--
 # 📄 Dosya Yolu: /TurkuazAV/Directory.Build.props
-# 📌 Amac: Uygulama surumunu 0.3.0 yapmak
+# 📌 Amac: Uygulama surumunu 0.3.1 yapmak
 # 📌 Modul - FileType: XML
-# Version: 0.3.0
-# Aciklama: Uygulama surumunu 0.3.0 yapmak
+# Version: 0.3.1
+# Aciklama: Uygulama surumunu 0.3.1 yapmak
 # Bagimli Oldugu Katman: Config
 -->
 
 <Project>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

@@ -1,7 +1,7 @@
 # 📄 Dosya Yolu: /TurkuazAV/docs/windows-desktop-preview.md
 # 📌 Amac: WinUI 3 deneysel masaustu uygulamasinin derleme ve test ilkelerini aciklamak
 # 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.3.0
+# Version: 0.3.1
 # Aciklama: Windows x64 GUI ilk asama dis politikasi
 # Bagimli Oldugu Katman: Controller | Service | Repo | View | Language
 
@@ -40,3 +40,14 @@ olusturulmadan bunu sunmak guvenli olmaz.
 - WinUI exe'nin self-contained artifact olarak paketlenmesi ve imzalanmasi
 - Guvenilir kural servisi ve uretim publisher trust root bootstrapping
 - Manuel tarama ile YARA-X raporlama; otomatik AV verdict olmadan
+
+## 0.3.1 tani ve dogrulama
+
+CI'da paket `tools/verify-desktop-preview.ps1` ile kontrol edilir:
+exe SHA-256, runtimeconfig, deps, Core/GUI DLL ve deneysel surum
+uyarisi. Bu dogrulama gercek Windows masaustu acilisinin yerine gecmez.
+
+GUI hatalari ve kritik acilis olaylari yalnizca yerelde, 
+`%LOCALAPPDATA%\\TurkuazAV\\diagnostics` dizinine yazilir.
+Dosya yollarini, SHA-256 ozetlerini veya exception mesajlarini loglamaz.
+Kullanici oturum gecmisi ise diske yazilmaz, en fazla 20 girdidir.
