@@ -1,49 +1,58 @@
 # 📄 Dosya Yolu: /TurkuazAV/README.md
-# 📌 Amac: TurkuazAV projesinin kapsamini ve gelistirme adimlarini tanimlamak
-# 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.1.0
-# Aciklama: Platform bagimsiz tarama temeli ve guvenli gelistirme ilkeleri
+# 📌 Amac: 0.2.0 kural tarama kullanimini ve guvenlik sinirlarini belgelemek
+# 📌 Modul - FileType: Markdown
+# Version: 0.2.0
+# Aciklama: 0.2.0 kural tarama kullanimini ve guvenlik sinirlarini belgelemek
 # Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
 
 # TurkuazAV
 
-TurkuazAV, coklu platform icin tasarlanan moduler guvenlik ve dosya analizi projesidir.
+TurkuazAV coklu platform destekli deneysel dosya tarama ve kural analiz altyapisidir.
 
 ## Durum
 
-0.1.0 gelistirme asamasidir. Ilk prototip **antivirus degildir**:
-dosyalari SHA-256 ile ozetler ve raporlar; zararlilari tespit ettigini
-veya engelledigini iddia etmez. Gercek zamanli koruma, karantina ve
-otomatik silme etkin degildir.
+0.2.0: Salt okunur SHA-256 dosya envanteri ve imzali YARA-X kural eslestirmesi.
+**Bu surum tam antivirus urunu degildir.** Eslesme zararlilik kaniti degildir.
+Karantina, gercek zamanli koruma, otomatik silme ve EDR yoktur.
 
-## Mimari
+## Gereksinimler
 
-- Controller: Istek kabul eder ve Service cagirir.
-- Service: Tarama akisini ve is kurallarini yonetir.
-- Repository: Yerel dosya erisimini soyutlar.
-- Tool: Dosya ozeti gibi bagimsiz analiz araclarini uyarlar.
-- View: Sonuclari gosterir.
-- Language: Kullaniciya gosterilen mesajlari tutar.
-- Config: Ortak sabitleri ve limitleri tanimlar.
+- .NET 10 SDK
+- Kural taramasi icin resmi `yr` CLI: https://github.com/VirusTotal/yara-x
+- RSA-PSS-SHA256 ile imzalanmis kaynak kural dosyasi
+- En az 2048-bit RSA PEM public key (SubjectPublicKeyInfo)
 
-## Baslangic
-
-.NET 10 SDK gereklidir.
+## Komutlar
 
 ```text
 dotnet run --project src/TurkuazAV.Cli -- scan .
 dotnet run --project tests/TurkuazAV.SmokeTests
+dotnet run --project src/TurkuazAV.Cli -- scan-rules TARGET RULES.YAR RULES.SIG PUBLIC.PEM ABSOLUTE_YR_PATH
 ```
 
-Ornekler salt-okunur tarama yapar; dosyalari silmez veya karantinaya almaz.
+Imza, ham `RULES.YAR` baytlarina RSA-PSS-SHA256 ile uygulanir.
+Imza dogrulanmadan kural dosyasi `yr` icin acilmaz. Dogrulanmis baytlar
+gecici kopyadan taranir. `yr` programi bash/shell kullanilmadan
+`scan --output-format=ndjson` parametreleriyle calistirilir.
 
-## Yol haritasi
+## Guvenlik ve platform sinirlari
 
-1. 0.1.0: Ortak dosya envanteri, SHA-256 taramasi ve Windows/Linux CI.
-2. 0.2.0: YARA-X icin ayrilmis Tool arayuzu, kural imza dogrulamasi.
-3. 0.3.0: Kontrollu karantina ve geri yukleme.
-4. 0.4.0: Isletim sistemine ozel olay izleme.
-5. 0.5.0+: Risk incelemesi tamamlandiktan sonra gercek zamanli koruma.
+- CLI public key dosyasini kullanicidan kabul eder: bu yalnizca gelistirme/test
+  kolayligidir. Uretimde yayinci anahtari uygulamada sabitlenmelidir.
+- Harici YARA-X executable dosyasi simdilik otomatik imza dogrulamaz.
+  Guvenilir resmi kaynaktan edinilmelidir.
+- Ornek smoke test bir sahte motorla Service mantigini sinar.
+  Gercek YARA-X executable ile E2E test henuz CI icinde bulunmaz.
+- Hedef dosya tarama sirasinda degistirilebilir; TOCTOU onlemi henuz yoktur.
+- Windows ve Linux CI bulunur. macOS CI planlanmistir.
+- Lisans secimi henuz kesinlestirilmemistir. Public olmasi otomatik
+  yeniden dagitim veya ticari kullanim izni anlamina gelmez.
 
-Lisans secimi ayri bir karardir; bu depo public oldugu icin kodu otomatik
-olarak yeniden kullanim hakki vermez.
+## Mimari
+
+Controller -> Service -> Repo/Tool -> View -> Language, merkezi Config.
+
+## Sonraki adimlar
+
+Gercek YARA-X E2E, sabit guven anahtari, ikili dosya dogrulama,
+dosya anlik goruntusu ve sonra guvenli karantina prototipi.

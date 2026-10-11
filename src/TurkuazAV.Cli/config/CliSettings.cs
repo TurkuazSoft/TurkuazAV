@@ -1,18 +1,18 @@
 // # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Cli/config/CliSettings.cs
-// # 📌 Amac: Komutlarin isimlerini ve cikis kodlarini merkezilestirmek
-// # 📌 Modul - FileType: Config - CSharp
-// # Version: 0.1.0
-// # Aciklama: Komutlarin isimlerini ve cikis kodlarini merkezilestirmek
+// # 📌 Amac: Konsol komutlarini ve cikis kodlarini merkezi tanimlamak
+// # 📌 Modul - FileType: CSharp
+// # Version: 0.2.0
+// # Aciklama: Konsol komutlarini ve cikis kodlarini merkezi tanimlamak
 // # Bagimli Oldugu Katman: Config
 
 namespace TurkuazAV.Cli.Config;
-
 public static class CliSettings
 {
     public const string ScanCommand = "scan";
-    public const int ScanArgumentsCount = 2;
+    public const string ScanRulesCommand = "scan-rules";
+    public const int ScanArgs = 2;
+    public const int RuleArgs = 6;
 }
-
 public static class ExitCodes
 {
     public const int Success = 0;
