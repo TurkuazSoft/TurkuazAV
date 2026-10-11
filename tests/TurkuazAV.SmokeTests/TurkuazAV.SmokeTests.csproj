@@ -1,0 +1,17 @@
+<!--
+# 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.SmokeTests/TurkuazAV.SmokeTests.csproj
+# 📌 Amac: Dis paket gerektirmeyen ortak tarama regresyon testlerini derlemek
+# 📌 Modul - FileType: Tests - XML
+# Version: 0.1.0
+# Aciklama: Dis paket gerektirmeyen ortak tarama regresyon testlerini derlemek
+# Bagimli Oldugu Katman: Service | Repo | Tool
+-->
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/TurkuazAV.Core/TurkuazAV.Core.csproj" />
+  </ItemGroup>
+</Project>

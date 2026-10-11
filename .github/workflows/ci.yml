@@ -1,0 +1,38 @@
+# 📄 Dosya Yolu: /TurkuazAV/.github/workflows/ci.yml
+# 📌 Amac: Windows ve Linux icin derleme ve smoke testlerini calistirmak
+# 📌 Modul - FileType: CI - YAML
+# Version: 0.1.0
+# Aciklama: Windows ve Linux icin derleme ve smoke testlerini calistirmak
+# Bagimli Oldugu Katman: Tool
+
+name: cross-platform-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore CLI
+        run: dotnet restore src/TurkuazAV.Cli/TurkuazAV.Cli.csproj
+      - name: Restore smoke tests
+        run: dotnet restore tests/TurkuazAV.SmokeTests/TurkuazAV.SmokeTests.csproj
+      - name: Build CLI
+        run: dotnet build src/TurkuazAV.Cli/TurkuazAV.Cli.csproj --configuration Release --no-restore
+      - name: Run smoke tests
+        run: dotnet run --project tests/TurkuazAV.SmokeTests/TurkuazAV.SmokeTests.csproj --configuration Release --no-restore

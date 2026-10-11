@@ -1,0 +1,16 @@
+# 📄 Dosya Yolu: /TurkuazAV/.gitignore
+# 📌 Amac: Gecici ve uretilen dosyalari kaynak kontrolden cikarmak
+# 📌 Modul - FileType: Repository - GitIgnore
+# Version: 0.1.0
+# Aciklama: Gecici ve uretilen dosyalari kaynak kontrolden cikarmak
+# Bagimli Oldugu Katman: Config
+
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+TestResults/
+artifacts/
+*.log

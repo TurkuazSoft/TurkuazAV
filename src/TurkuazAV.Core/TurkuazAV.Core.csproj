@@ -1,0 +1,11 @@
+<!--
+# 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Core/TurkuazAV.Core.csproj
+# 📌 Amac: Platform bagimsiz tarama kutuphanesini derlemek
+# 📌 Modul - FileType: Core - XML
+# Version: 0.1.0
+# Aciklama: Platform bagimsiz tarama kutuphanesini derlemek
+# Bagimli Oldugu Katman: Service | Repo | Tool | Language | Config
+-->
+
+<Project Sdk="Microsoft.NET.Sdk">
+</Project>
