@@ -1,8 +1,8 @@
 // # 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.SmokeTests/Program.cs
-// # 📌 Amac: Hash testleri ile imza dogrulama testlerini birlikte calistirmak
-// # 📌 Modul - FileType: CSharp
-// # Version: 0.2.0
-// # Aciklama: Hash testleri ile imza dogrulama testlerini birlikte calistirmak
+// # 📌 Amac: Hash ve dosya boyut limiti davranisini test etmek
+// # 📌 Modul - FileType: Tests - CSharp
+// # Version: 0.1.0
+// # Aciklama: Hash ve dosya boyut limiti davranisini test etmek
 // # Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
 using System.Security.Cryptography;
@@ -13,7 +13,6 @@ using TurkuazAV.Core.Repositories;
 using TurkuazAV.Core.Services;
 using TurkuazAV.Core.Tools;
 using TurkuazAV.SmokeTests.Config;
-using TurkuazAV.SmokeTests.Services;
 
 var root = Path.Combine(
     Path.GetTempPath(),
@@ -48,9 +47,9 @@ try
         || hashed.Path != samplePath
         || hashed.Sha256 != expectedHash
         || skipped.SizeBytes != TestSettings.OversizedFileBytes)
+    {
         throw new InvalidOperationException(TestSettings.Failed);
-
-    await RuleSignatureSmoke.RunAsync(root);
+    }
 
     Console.WriteLine(TestSettings.Passed);
     return 0;
