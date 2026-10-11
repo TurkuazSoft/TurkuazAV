@@ -1,29 +1,33 @@
 # 📄 Dosya Yolu: /TurkuazAV/README.md
-# 📌 Amac: TurkuazAV 0.2.2 kurulumunu, kullanimi ve guvenlik sinirlarini aciklamak
+# 📌 Amac: TurkuazAV 0.2.3 ozelliklerini ve sinirlarini aciklamak
 # 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.2.2
-# Aciklama: Imzali kural tarama ve motor binary butunluk denetimi
+# Version: 0.2.3
+# Aciklama: Deneysel tarama motoru ve imzali yayinci paket guven modeli
 # Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
 
 # TurkuazAV
 
-TurkuazAV, coklu platform hedefli deneysel ve salt-okunur dosya analiz
-projesidir. Bu kod henuz antivirus korumasi sunmaz.
+TurkuazAV, Windows/Linux icin gelistirilen deneysel ve salt-okunur
+dosya analiz altyapisidir. **Tam korumali antivirus degildir.**
 
-## 0.2.2 neler sunuyor?
+## 0.2.3 durumu
 
-- Platform bagimsiz .NET 10 SHA-256 dosya envanteri
-- RSA-PSS-SHA256 dogrulanmis kaynak YARA-X kurallarini analiz etme
-- YARA-X v1.21.0 resmi arsiv paketlerini sabit SHA-256 ile dogrulama
-- Windows x64 ve Linux x64 `yr` binary SHA-256 pinleme; her calistirmadan
-  once ikili dosyanin hash degerini kontrol etme
-- Hedef dosyanin boyut sinirli gecici kopyasini tarama
-- Windows ve Linux E2E: zararsiz eslesen/eslesmeyen ornekler,
-  bozuk kural imzasi, bozuk motor dosyasi testi
+- .NET 10 ile salt-okunur SHA-256 dosya envanteri
+- Gercek YARA-X v1.21.0 motoru: Windows x64 ve Linux x64
+- Sabitlenmis resmi motor SHA-256 profilleri
+- Gelistirme/test modunda kullanici secimli RSA-PSS imzali kural taramasi
+- **Yeni:** Yayinci anahtarlarini uygulamadan bagimsiz dogrulanmis
+  konfigurasyondan alan `TrustedRuleKeyring` API'si
+- **Yeni:** Surum numarasi, imzalayan key ID ve kural SHA-256
+  ozeti iceren imzali manifest modeli
+- **Yeni:** Kalici en yuksek paket surumu ve eski surum reddi
+- **Yeni:** Izin verilen anahtar listesinin guncellenmesiyle rotasyon/revocation
+- Windows/Linux smoke testlerinde bozuk imza, degistirilen kurallar,
+  taninmayan anahtar, rollback ve bozuk state senaryolari
 
-## Gelistirme
+## Yerel gelistirme
 
-.NET 10 SDK ve resmi YARA-X CLI gerekir.
+.NET 10 SDK gerekir. YARA-X CLI dogrulanmis resmi surumden kurulur.
 
 ```text
 dotnet run --project src/TurkuazAV.Cli -- scan .
@@ -32,44 +36,50 @@ pwsh ./tools/install-yarax.ps1
 dotnet run --project tests/TurkuazAV.IntegrationTests
 ```
 
-CI'da installer `TURKUAZ_YR_PATH` ortam degiskenini ayarlar.
-Yerel testte YARA-X programina giden mutlak yolu bu ortam
-degiskenine kendiniz atamalisiniz.
+CI, `TURKUAZ_YR_PATH` ortam degiskenini ayarlar.
+Yerel E2E testte bu degiskeni resmi `yr` programinin
+mutlak yoluna ayarlamak gerekir.
 
-Kural tarama komutu:
+**Gelistirme modu komutu:**
 
 ```text
 dotnet run --project src/TurkuazAV.Cli -- scan-rules TARGET RULES.YAR RULES.SIG PUBLIC.PEM ABSOLUTE_YR_PATH
 ```
 
-`RULES.SIG`, `RULES.YAR` dosyasinin ham baytlarina RSA-PSS-SHA256
-imzasi olmalidir. `PUBLIC.PEM` SubjectPublicKeyInfo formatindadir
-ve RSA key uzunlugu en az 2048 bittir.
+Bu komut kullanicidan public key aldigi icin **guvenilir yayinci
+dogrulamasi yapmaz**. Ileride uretim modunda kaldirilacak veya
+sadece yetkili gelistirici ortaminda kalacaktir.
+
+## Imzali manifest (yeni kutuphane API'si)
+
+`TrustedRulePackageService`, `TrustedRuleKeyring` ve
+`LocalRuleVersionRepository` 0.2.3'te eklendi. Manifeste ait
+JSON alanlari `schema`, `sequence`, `keyId`, `rulesSha256`.
+Ilgili RSA-PSS-SHA256 imzasi, `TrustedRuleManifestCodec.SignaturePayload`
+kanonik baytlari uzerinden uretilir.
+
+Yayinci anahtarlari **yalnizca guvenilir uygulama bootstrap
+katmanindan** saglanmali; indirilen manifestten veya kullanicidan
+alinan key ile guven kokeni olusturulmamalidir. Iki onayli anahtari
+bir sure birlikte tanitmak rotasyona imkan verir; eski anahtar
+keyring'den cikarilarak iptal edilir.
+
+**Onemli sinir:** Bu altyapi 0.2.3'te kutuphane API'si olarak sunulur.
+Henuz TurkuazAV CLI kural tarama akisi ile baglanmamistir.
+Gercek yayinlayici public key'i henuz olusturulup pinlenmedi;
+smoke test anahtarlari yalnizca test sirasinda gecici uretilir.
 
 ## Guvenlik sinirlari
 
-- **Gelistirici kullanimina ozeldir:** CLI acik anahtari kullanicidan
-  kabul ettigi icin henüz bir *yayinci guven kokune* bagli degildir.
-  Gecersiz imzayi reddetmesi tek basina uretim guvenligi saglamaz.
-- Engine hashleri, belirli YARA-X v1.21.0 Windows x64 ve Linux x64
-  dosyalarini kabul eder. Baska surum, mimari ya da degistirilmis
-  binary reddedilir. macOS icin henuz guven profili yoktur.
-- Hash kontrolu ve Process.Start arasinda dar bir dosya degistirme
-  yarisi olabilir. Tam calistirma izolasyonu ve guvenli deployment
-  henuz bulunmuyor.
-- Hedef snapshot kopyalanirken kaynak dosyanin degistirilmesi
-  tamamen engellenmez.
-- Kural eslesmesi malware verdict degildir. Karantina, otomatik
-  silme, gercek zamanli izleme ve kernel surucusu bulunmaz.
-- Ozel imzalama anahtari bu repoya veya CI loglarina eklenmemelidir.
-- Public repo kaynak lisansi henuz belirlenmemistir.
-
-## Katmanlar
-
-Controller -> Service -> Repo/Tool -> View -> Language,
-ortak ayarlar Config katmaninda.
-
-## Siradaki adim
-
-Uretim kural guven kokunun sahibini belirleme, anahtar rotasyonu,
-guvenli motor kurulumu, sandbox, Windows WinUI test arayuzu.
+- Local anti-rollback state dosyasi onayli, servis hesabiyla korunan
+  bir dizinde tutulmalidir. Dosyanin silinmesi veya sistemin
+  eski yedekten donmesi karsisinda tek basina yeterli degildir.
+- Version state'i ayni anda acan baska islem olursa islem
+  guvenli tarafta hata verir; fail closed.
+- RSA anahtar rotasyonu su an sadece API ile; otomatik imzali
+  policy guncelleme protokolu yoktur.
+- YARA-X binary hash kontrolu ile Process.Start arasinda kucuk
+  bir TOCTOU penceresi bulunur. Izole sandbox mevcut degildir.
+- MacOS destegi ve WinUI arayuzu henuz tamamlanmamistir.
+- Karantina, gercek zamanli koruma ve zararlilik karari yoktur.
+- Public repo icin dagitim lisansi secilmemistir.

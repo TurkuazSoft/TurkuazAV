@@ -1,8 +1,8 @@
 <!--
 # 📄 Dosya Yolu: /TurkuazAV/Directory.Build.props
-# 📌 Amac: Ortak .NET surumunu 0.2.1'e yukeltmek
+# 📌 Amac: Ortak .NET surumunu 0.2.3'e yukeltmek
 # 📌 Modul - FileType: Config - XML
-# Version: 0.2.2
+# Version: 0.2.3
 # Aciklama: Ortak .NET surumunu 0.2.1'e yukeltmek
 # Bagimli Oldugu Katman: Config
 -->
@@ -10,7 +10,7 @@
 <Project>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>0.2.2</Version>
+    <Version>0.2.3</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
