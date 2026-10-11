@@ -1,7 +1,7 @@
 // # 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.IntegrationTests/Program.cs
 // # 📌 Amac: Gercek YARA-X ile pozitif negatif ve bozuk imza akisini dogrulamak
 // # 📌 Modul - FileType: Tests - CSharp
-// # Version: 0.2.2
+// # Version: 0.2.4
 // # Aciklama: Gercek YARA-X ile pozitif negatif ve bozuk imza akisini dogrulamak
 // # Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
@@ -12,6 +12,7 @@ using TurkuazAV.Core.Language;
 using TurkuazAV.Core.Services;
 using TurkuazAV.Core.Tools;
 using TurkuazAV.IntegrationTests.Config;
+using TurkuazAV.IntegrationTests.Services;
 
 var enginePath = Environment.GetEnvironmentVariable(IntegrationSettings.EngineEnvironmentVariable);
 if (string.IsNullOrWhiteSpace(enginePath) || !File.Exists(enginePath))
@@ -93,6 +94,8 @@ try
 
     if (!untrustedRejected)
         throw new InvalidOperationException(IntegrationSettings.UntrustedEngineAccepted);
+
+    await TrustedRuleIntegrationTests.RunAsync(tempRoot, enginePath);
 
     Console.WriteLine(IntegrationSettings.TestsPassed);
     return 0;

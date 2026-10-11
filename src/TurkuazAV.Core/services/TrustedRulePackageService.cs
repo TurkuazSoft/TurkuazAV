@@ -1,9 +1,9 @@
 // # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Core/services/TrustedRulePackageService.cs
-// # 📌 Amac: Yayinci imzasi, hash, key rotasyonu ve rollback kontrollerini siralamak
+// # 📌 Amac: Imzali paket guvenini taramadan bagimsiz dogrulamak ve basarili sonuc sonrasi surum islemek
 // # 📌 Modul - FileType: CSharp
-// # Version: 0.2.3
-// # Aciklama: Yayinci imzasi, hash, key rotasyonu ve rollback kontrollerini siralamak
-// # Bagimli Oldugu Katman: Service | Repo | Tool | Config
+// # Version: 0.2.4
+// # Aciklama: Imzali paket guvenini taramadan bagimsiz dogrulamak ve basarili sonuc sonrasi surum islemek
+// # Bagimli Oldugu Katman: Service | Repo | Tool
 
 using System.Security.Cryptography;
 using TurkuazAV.Core.Language;
@@ -19,7 +19,8 @@ public sealed class TrustedRulePackageService(
     IRuleSignatureTool signatureTool,
     IRuleVersionRepository versions)
 {
-    public async Task<VerifiedRulePackage> VerifyAndAcceptAsync(
+    // Verification must never modify persistent anti-rollback state.
+    public async Task<VerifiedRulePackage> VerifyAsync(
         string rulesPath,
         string manifestPath,
         string signaturePath,
@@ -29,18 +30,43 @@ public sealed class TrustedRulePackageService(
             rulesPath, manifestPath, signaturePath, cancellationToken);
         var manifest = TrustedRuleManifestCodec.Parse(package.ManifestJson);
 
-        // Only keys injected by the trusted application bootstrap may verify publishers.
-        var publicKey = keyring.GetRequiredKey(manifest.KeyId);
-        var payload = TrustedRuleManifestCodec.SignaturePayload(manifest);
-        if (!signatureTool.Verify(payload, package.Signature, publicKey))
+        var publisherKey = keyring.GetRequiredKey(manifest.KeyId);
+        var signedPayload = TrustedRuleManifestCodec.SignaturePayload(manifest);
+        if (!signatureTool.Verify(signedPayload, package.Signature, publisherKey))
             throw new InvalidDataException(TrustedRuleMessages.BadSignature);
 
-        var expectedDigest = Convert.FromHexString(manifest.RulesSha256);
-        var actualDigest = SHA256.HashData(package.Rules);
-        if (!CryptographicOperations.FixedTimeEquals(expectedDigest, actualDigest))
+        var expectedRulesDigest = Convert.FromHexString(manifest.RulesSha256);
+        var actualRulesDigest = SHA256.HashData(package.Rules);
+        if (!CryptographicOperations.FixedTimeEquals(
+            expectedRulesDigest, actualRulesDigest))
             throw new InvalidDataException(TrustedRuleMessages.BadRuleHash);
 
-        await versions.AcceptAsync(manifest.Sequence, cancellationToken);
-        return new VerifiedRulePackage(manifest.Sequence, manifest.KeyId, package.Rules);
+        var manifestFingerprint =
+            Convert.ToHexString(SHA256.HashData(signedPayload)).ToLowerInvariant();
+        return new VerifiedRulePackage(
+            manifest.Sequence, manifest.KeyId, package.Rules, manifestFingerprint);
+    }
+
+    public Task CommitVerifiedAsync(
+        VerifiedRulePackage verified,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(verified);
+        return versions.AcceptAsync(
+            verified.Sequence, verified.ManifestFingerprint, cancellationToken);
+    }
+
+    // Backwards-compatible library entry point. This records a verified package,
+    // but callers should use TrustedRuleScanService for scan-before-commit flow.
+    public async Task<VerifiedRulePackage> VerifyAndAcceptAsync(
+        string rulesPath,
+        string manifestPath,
+        string signaturePath,
+        CancellationToken cancellationToken = default)
+    {
+        var verified = await VerifyAsync(
+            rulesPath, manifestPath, signaturePath, cancellationToken);
+        await CommitVerifiedAsync(verified, cancellationToken);
+        return verified;
     }
 }

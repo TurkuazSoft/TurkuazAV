@@ -1,8 +1,8 @@
 // # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Core/config/TrustedRuleSettings.cs
-// # 📌 Amac: Imzali paket formatini ve guvenlik limitlerini merkezi tanimlamak
+// # 📌 Amac: Guvenilir paket surum kaydinin v2 formatini tanimlamak
 // # 📌 Modul - FileType: CSharp
-// # Version: 0.2.3
-// # Aciklama: Imzali paket formatini ve guvenlik limitlerini merkezi tanimlamak
+// # Version: 0.2.4
+// # Aciklama: Guvenilir paket surum kaydinin v2 formatini tanimlamak
 // # Bagimli Oldugu Katman: Config
 
 namespace TurkuazAV.Core.Config;
@@ -15,7 +15,9 @@ public static class TrustedRuleSettings
     public const int MaximumSignatureBytes = 8_192;
     public const int MaximumKeyIdLength = 64;
     public const int Sha256HexLength = 64;
-    public const int VersionStateLengthBytes = sizeof(long);
+    public const int SequenceLengthBytes = sizeof(long);
+    public const int FingerprintLengthBytes = 32;
+    public const int VersionStateLengthBytes = SequenceLengthBytes + FingerprintLengthBytes;
     public const string ManifestSchemaField = "schema";
     public const string ManifestVersionField = "sequence";
     public const string ManifestKeyIdField = "keyId";

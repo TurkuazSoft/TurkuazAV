@@ -1,7 +1,7 @@
 // # 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.IntegrationTests/config/IntegrationSettings.cs
 // # 📌 Amac: Zararsiz orneklerin ve beklenen kural eslesmelerinin ayarlarini tanimlamak
 // # 📌 Modul - FileType: Config - CSharp
-// # Version: 0.2.2
+// # Version: 0.2.4
 // # Aciklama: Zararsiz orneklerin ve beklenen kural eslesmelerinin ayarlarini tanimlamak
 // # Bagimli Oldugu Katman: Config
 
@@ -29,6 +29,21 @@ public static class IntegrationSettings
     public const string UntrustedEngineFile = "untrusted-yr.bin";
     public const string UntrustedEngineContent = "harmless non-engine content";
     public const string UntrustedEngineAccepted = "Untrusted YARA-X executable was not rejected.";
+    public const string TrustedTestDirectory = "trusted-scan-tests";
+    public const string TrustedManifestName = "trusted-manifest.json";
+    public const string TrustedStateName = "trusted-sequence.bin";
+    public const string TrustedKeyId = "test-publisher-2026";
+    public const string AlternativeRule =
+        "rule TurkuazAV_Alternative { strings: $marker = " +
+        "\"UNRELATED_BENIGN_PATTERN\" condition: $marker }";
+    public const string SequenceConflictAccepted = "Same rule sequence with different content was accepted.";
+    public const string RollbackAccepted = "Older signed rule package was accepted.";
+    public const string FailedScanAdvancedVersion = "Failed engine scan advanced trusted rule sequence.";
+    public const string ModifiedRuleAccepted = "Modified signed rule package was accepted.";
+    public const string TrustedTestsPassed = "TRUSTED_YARAX_E2E_TESTS_PASSED";
+    public const long TrustedFirstVersion = 1;
+    public const long TrustedSecondVersion = 2;
+    public const long TrustedThirdVersion = 3;
     public const string TestsPassed = "YARAX_E2E_TESTS_PASSED";
     public const int SigningKeyBits = 2048;
 }
