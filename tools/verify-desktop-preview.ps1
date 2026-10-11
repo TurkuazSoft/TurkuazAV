@@ -45,8 +45,10 @@ if ($actual -cne $expected) {
 }
 
 $readme = Get-Content -LiteralPath (Join-Path $folder 'README-LOCAL-TEST.txt') -Raw
-if ($readme -notmatch 'UNSIGNED LOCAL TEST BUILD'
-    -or $readme -notmatch 'NOT a certified antivirus') {
+if (
+    ($readme -notmatch 'UNSIGNED LOCAL TEST BUILD') -or
+    ($readme -notmatch 'NOT a certified antivirus')
+) {
     throw 'Missing experimental build disclosure'
 }
 
