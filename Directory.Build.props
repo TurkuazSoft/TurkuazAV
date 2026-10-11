@@ -1,0 +1,19 @@
+<!--
+# 📄 Dosya Yolu: /TurkuazAV/Directory.Build.props
+# 📌 Amac: Ortak .NET derleme ve surum ayarlarini tanimlamak
+# 📌 Modul - FileType: Build - XML
+# Version: 0.1.0
+# Aciklama: Ortak .NET derleme ve surum ayarlarini tanimlamak
+# Bagimli Oldugu Katman: Config
+-->
+
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Version>0.1.0</Version>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

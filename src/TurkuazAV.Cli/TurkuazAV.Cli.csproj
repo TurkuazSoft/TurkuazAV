@@ -1,0 +1,17 @@
+<!--
+# 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Cli/TurkuazAV.Cli.csproj
+# 📌 Amac: Konsol uygulamasini Core kutuphanesine baglamak
+# 📌 Modul - FileType: CLI - XML
+# Version: 0.1.0
+# Aciklama: Konsol uygulamasini Core kutuphanesine baglamak
+# Bagimli Oldugu Katman: Controller | View
+-->
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../TurkuazAV.Core/TurkuazAV.Core.csproj" />
+  </ItemGroup>
+</Project>
