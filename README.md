@@ -45,6 +45,12 @@ ve ekrandan test (UI automation) henuz bulunmamaktadir.
 Windows GUI ilk dogrulamasi GitHub-hosted Windows 2022 runner
 uzerinde; Linux ortak motor CI'si eskisi gibi devam eder.
 
+Basarili `main` CI calismalarinda yalnizca **imzasiz yerel test icin**
+`TurkuazAV-0.3.0-UNSIGNED-LOCAL-TEST-win-x64` adli artifact bulunur.
+Tum klasoru cikartip `TurkuazAV.Desktop.exe` dosyasini calistirin.
+Guncel antivirus uyarisini korumayi devre disi birakarak asmayan;
+uygulamayi test makinasi/izole VM ile sinirlandiran bir yontem izleyin.
+
 ## CLI ve guvenlik regresyonlari
 
 ```text
