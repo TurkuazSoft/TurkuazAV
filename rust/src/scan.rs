@@ -145,14 +145,24 @@ pub fn scan_path(path: &Path, cancelled: &AtomicBool) -> Result<Vec<FileScanResu
         bail!("Invalid scan root");
     }
     let mut results = Vec::new();
-    for item in WalkDir::new(path).follow_links(false).sort_by_file_name() {
+    for item in WalkDir::new(path)
+        .follow_links(false)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_entry(|entry| {
+            entry.depth() == 0
+                || fs::symlink_metadata(entry.path())
+                    .map(|meta| !is_reparse_or_symlink(&meta))
+                    .unwrap_or(true)
+        })
+    {
         if cancelled.load(Ordering::Relaxed) {
             bail!("Scan cancelled");
         }
         match item {
             Ok(entry) if entry.file_type().is_dir() => (),
             Ok(entry) => {
-                // Do not recurse into reparse directories on Windows.
+                // Reparse-directory descent is prohibited by filter_entry.
                 results.push(scan_file(entry.path(), cancelled));
             }
             Err(error) => results.push(FileScanResult {
