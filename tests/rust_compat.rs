@@ -6,7 +6,7 @@
 // Bagimli Oldugu Katman: Service | Tool | View
 
 use std::{fs, sync::atomic::AtomicBool};
-use turkuazav::{scan_path, ScanStatus, parse_yarax_output};
+use turkuazav::{parse_yarax_output, scan_path, ScanStatus};
 
 #[test]
 fn folder_scan_reports_success_without_malware_verdict() {
@@ -26,6 +26,8 @@ fn malicious_engine_output_path_does_not_masquerade_as_snapshot() {
     fs::write(&expected, b"data").unwrap();
     let other = dir.path().join("other");
     fs::write(&other, b"data").unwrap();
-    let payload = serde_json::json!({"path":other.to_string_lossy(), "rules":[{"identifier":"fake"}]}).to_string();
+    let payload =
+        serde_json::json!({"path":other.to_string_lossy(), "rules":[{"identifier":"fake"}]})
+            .to_string();
     assert!(parse_yarax_output(&payload, &expected).is_err());
 }

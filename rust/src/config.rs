@@ -15,8 +15,10 @@ pub const BUFFER_SIZE: usize = 81_920;
 pub const ENGINE_TIMEOUT_SECONDS: u64 = 30;
 pub const PACKAGE_SCHEMA: &str = "turkuazav.rule-package.v1";
 pub const SIGNATURE_DOMAIN: &str = "TurkuazAV.rule-package.v1";
-pub const WINDOWS_X64_ENGINE_SHA256: &str = "883c56964e0ffbe25eb0daf5b443914bea9db45d8dc4b6be7abbe59ff6797557";
-pub const LINUX_X64_ENGINE_SHA256: &str = "a4b6fec172c813cdfc099a4a392939cfc2c555e9e7745fb4b5ed369ab1edf93b";
+pub const WINDOWS_X64_ENGINE_SHA256: &str =
+    "883c56964e0ffbe25eb0daf5b443914bea9db45d8dc4b6be7abbe59ff6797557";
+pub const LINUX_X64_ENGINE_SHA256: &str =
+    "a4b6fec172c813cdfc099a4a392939cfc2c555e9e7745fb4b5ed369ab1edf93b";
 
 pub fn engine_digest() -> anyhow::Result<&'static str> {
     if cfg!(all(target_os = "windows", target_arch = "x86_64")) {

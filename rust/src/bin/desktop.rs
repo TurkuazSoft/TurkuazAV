@@ -7,14 +7,22 @@
 
 use eframe::egui;
 use std::{
-    collections::VecDeque, fs::{self, OpenOptions}, io::Write, path::PathBuf,
-    sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc::{self, Receiver}},
+    collections::VecDeque,
+    fs::{self, OpenOptions},
+    io::Write,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, Receiver},
+        Arc,
+    },
     thread,
 };
 use turkuazav::{scan_file, FileScanResult, ScanStatus};
 
 const HISTORY_LIMIT: usize = 20;
-const PREVIEW_WARNING: &str = "Deneysel tarayici - antivirus korumasi saglamaz. Yalnizca SHA-256 hesaplar.";
+const PREVIEW_WARNING: &str =
+    "Deneysel tarayici - antivirus korumasi saglamaz. Yalnizca SHA-256 hesaplar.";
 
 struct DesktopApp {
     selected: Option<PathBuf>,
@@ -29,10 +37,13 @@ struct DesktopApp {
 impl Default for DesktopApp {
     fn default() -> Self {
         Self {
-            selected: None, busy: false,
-            cancel: Arc::new(AtomicBool::new(false)), incoming: None,
+            selected: None,
+            busy: false,
+            cancel: Arc::new(AtomicBool::new(false)),
+            incoming: None,
             status: "Tarama icin dosya bekleniyor.".into(),
-            report: None, history: VecDeque::new(),
+            report: None,
+            history: VecDeque::new(),
         }
     }
 }
@@ -47,8 +58,12 @@ impl DesktopApp {
     }
 
     fn start(&mut self) {
-        let Some(path) = self.selected.clone() else { return };
-        if self.busy { return; }
+        let Some(path) = self.selected.clone() else {
+            return;
+        };
+        if self.busy {
+            return;
+        }
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancelled = Arc::clone(&self.cancel);
         let (tx, rx) = mpsc::channel();
@@ -72,14 +87,28 @@ impl DesktopApp {
                 self.report = None;
             } else {
                 self.status = match result.status {
-                    ScanStatus::Hashed => "Tarama tamamlandi. Bu sonuc virus temizligi kaniti degildir.",
+                    ScanStatus::Hashed => {
+                        "Tarama tamamlandi. Bu sonuc virus temizligi kaniti degildir."
+                    }
                     ScanStatus::Skipped => "Dosya atlandi.",
                     ScanStatus::Failed => "Dosya taranamadi.",
-                }.into();
-                let name = result.path.file_name().unwrap_or_default().to_string_lossy();
-                self.history.push_front(format!("{} | {} | {:?}", chrono::Local::now().format("%Y-%m-%d %H:%M"), name, result.status));
+                }
+                .into();
+                let name = result
+                    .path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy();
+                self.history.push_front(format!(
+                    "{} | {} | {:?}",
+                    chrono::Local::now().format("%Y-%m-%d %H:%M"),
+                    name,
+                    result.status
+                ));
                 self.history.truncate(HISTORY_LIMIT);
-                if result.status == ScanStatus::Failed { log_event("SCAN_FAILED", "ScanError"); }
+                if result.status == ScanStatus::Failed {
+                    log_event("SCAN_FAILED", "ScanError");
+                }
                 self.report = Some(result);
             }
         }
@@ -89,7 +118,9 @@ impl DesktopApp {
 impl eframe::App for DesktopApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.poll();
-        if self.busy { ctx.request_repaint_after(std::time::Duration::from_millis(50)); }
+        if self.busy {
+            ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        }
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading(format!("TurkuazAV v{}", env!("CARGO_PKG_VERSION")));
             ui.strong("DOSYA ANALIZI / RUST PREVIEW");
@@ -98,16 +129,38 @@ impl eframe::App for DesktopApp {
             ui.add_space(15.0);
             ui.group(|ui| {
                 ui.heading("Dosya secimi");
-                ui.label(self.selected.as_ref().map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "Henuz dosya secilmedi.".into()));
+                ui.label(
+                    self.selected
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "Henuz dosya secilmedi.".into()),
+                );
                 ui.horizontal(|ui| {
-                    if ui.add_enabled(!self.busy, egui::Button::new("Dosya sec")).clicked() { self.pick(); }
-                    if ui.add_enabled(!self.busy && self.selected.is_some(), egui::Button::new("SHA-256 tara")).clicked() { self.start(); }
-                    if ui.add_enabled(self.busy, egui::Button::new("Iptal")).clicked() {
+                    if ui
+                        .add_enabled(!self.busy, egui::Button::new("Dosya sec"))
+                        .clicked()
+                    {
+                        self.pick();
+                    }
+                    if ui
+                        .add_enabled(
+                            !self.busy && self.selected.is_some(),
+                            egui::Button::new("SHA-256 tara"),
+                        )
+                        .clicked()
+                    {
+                        self.start();
+                    }
+                    if ui
+                        .add_enabled(self.busy, egui::Button::new("Iptal"))
+                        .clicked()
+                    {
                         self.cancel.store(true, Ordering::Relaxed);
                         self.status = "Iptal istendi...".into();
                     }
-                    if self.busy { ui.spinner(); }
+                    if self.busy {
+                        ui.spinner();
+                    }
                 });
                 ui.label(&self.status);
             });
@@ -115,12 +168,25 @@ impl eframe::App for DesktopApp {
             ui.group(|ui| {
                 ui.heading("Son analiz raporu");
                 if let Some(report) = &self.report {
-                    ui.label(format!("Durum: {:?} {}", report.status, report.details.as_deref().unwrap_or("")));
-                    ui.label(format!("Dosya boyutu: {}", report.size_bytes.map(|n| format!("{n} bayt")).unwrap_or_else(|| "-".into())));
+                    ui.label(format!(
+                        "Durum: {:?} {}",
+                        report.status,
+                        report.details.as_deref().unwrap_or("")
+                    ));
+                    ui.label(format!(
+                        "Dosya boyutu: {}",
+                        report
+                            .size_bytes
+                            .map(|n| format!("{n} bayt"))
+                            .unwrap_or_else(|| "-".into())
+                    ));
                     if let Some(digest) = &report.sha256 {
                         ui.monospace(digest);
                         if ui.button("SHA-256 kopyala").clicked() {
-                            if arboard::Clipboard::new().and_then(|mut c| c.set_text(digest.clone())).is_ok() {
+                            if arboard::Clipboard::new()
+                                .and_then(|mut c| c.set_text(digest.clone()))
+                                .is_ok()
+                            {
                                 self.status = "Hash panoya kopyalandi.".into();
                             } else {
                                 log_event("COPY_FAILED", "ClipboardError");
@@ -128,7 +194,9 @@ impl eframe::App for DesktopApp {
                             }
                         }
                     }
-                } else { ui.label("Rapor yok."); }
+                } else {
+                    ui.label("Rapor yok.");
+                }
                 ui.small("SHA-256 bir guvenlik hukmu degildir.");
             });
             ui.add_space(12.0);
@@ -139,9 +207,13 @@ impl eframe::App for DesktopApp {
                     self.history.clear();
                     self.status = "Oturum gecmisi temizlendi.".into();
                 }
-                egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
-                    for item in &self.history { ui.label(item); }
-                });
+                egui::ScrollArea::vertical()
+                    .max_height(150.0)
+                    .show(ui, |ui| {
+                        for item in &self.history {
+                            ui.label(item);
+                        }
+                    });
             });
         });
     }
@@ -150,18 +222,31 @@ impl eframe::App for DesktopApp {
 /// No paths, hashes, message bodies, command lines or user identifiers are logged.
 fn log_event(code: &str, kind: &str) {
     let _ = (|| -> std::io::Result<()> {
-        let Some(local) = dirs::data_local_dir() else { return Ok(()) };
+        let Some(local) = dirs::data_local_dir() else {
+            return Ok(());
+        };
         let folder = local.join("TurkuazAV").join("diagnostics");
         fs::create_dir_all(&folder)?;
         let now = chrono::Utc::now();
         let file = folder.join(format!("desktop-{}.log", now.format("%Y%m%d")));
-        writeln!(OpenOptions::new().create(true).append(true).open(file)?, "{} | {} | {}", now.to_rfc3339(), code, kind)?;
+        writeln!(
+            OpenOptions::new().create(true).append(true).open(file)?,
+            "{} | {} | {}",
+            now.to_rfc3339(),
+            code,
+            kind
+        )?;
         if let Ok(entries) = fs::read_dir(&folder) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().into_owned();
-                if !name.starts_with("desktop-") || !name.ends_with(".log") { continue; }
+                if !name.starts_with("desktop-") || !name.ends_with(".log") {
+                    continue;
+                }
                 if let Ok(age) = entry.metadata().and_then(|m| m.modified()) {
-                    if age.elapsed().is_ok_and(|duration| duration.as_secs() > 7 * 24 * 3600) {
+                    if age
+                        .elapsed()
+                        .is_ok_and(|duration| duration.as_secs() > 7 * 24 * 3600)
+                    {
                         let _ = fs::remove_file(entry.path());
                     }
                 }
@@ -174,7 +259,10 @@ fn log_event(code: &str, kind: &str) {
 fn main() -> eframe::Result<()> {
     log_event("APP_START", "Startup");
     eframe::run_native(
-        &format!("TurkuazAV v{} - Deneysel Dosya Analizi", env!("CARGO_PKG_VERSION")),
+        &format!(
+            "TurkuazAV v{} - Deneysel Dosya Analizi",
+            env!("CARGO_PKG_VERSION")
+        ),
         eframe::NativeOptions::default(),
         Box::new(|_| Ok(Box::new(DesktopApp::default()))),
     )
