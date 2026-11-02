@@ -1,105 +1,52 @@
-# 📄 Dosya Yolu: /TurkuazAV/README.md
-# 📌 Amac: TurkuazAV 0.3.1 GUI ve guvenli tarama test mimarisini tanimlamak
-# 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.3.1
-# Aciklama: WinUI 3 preview ile ortak Windows/Linux tarama altyapisi
-# Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
+<!--
+Dosya Yolu: REPO_ROOT/README.md
+Amac: Native Rust TurkuazAV v0.3.1 test surumunu tanitmak
+Modul - FileType: Documentation - Markdown
+Version: 0.3.1
+Aciklama: Rust core, CLI ve GUI; real-time AV yok
+Bagimli Oldugu Katman: Documentation
+-->
+# TurkuazAV 0.3.1 - Rust Native Preview
 
-# TurkuazAV
+TurkuazAV is a **read-only experimental file analysis tool**, **not an antivirus**. The v0.3.1 implementation is written in Rust: scanning core, signed-rule processor, CLI and native desktop preview.
 
-TurkuazAV, coklu platform icin deneysel dosya analiz ve guvenlik
-altyapisi projesidir. **Bu surum tam bir antivirus degildir.**
+## Capabilities
 
-## Surum 0.3.1 (Windows WinUI 3 test arayuzu)
+- **Rust Core**: SHA-256 file/directory scan, 100 MiB default per-file ceiling, skip symlinks/reparse points, cancellation and explicit error reporting.
+- **Rust CLI**: `scan` and developer-only `scan-rules` commands.
+- **YARA-X**: verifies RSA-PSS-SHA256 rule signature, snapshots rules and target, verifies pinned executable SHA-256 (Windows/Linux x64), bounded output and timeout.
+- **Trusted publisher API**: independent pinned keyring, strict four-field manifest, canonical payload, signed rule digest and persistent 40-byte anti-rollback state (same contract as .NET 0.2.4).
+- **Rust Desktop**: cross-platform egui GUI for *single file SHA-256 only*, file picker, cancel, read-only digest report, clipboard copy, maximum 20 in-memory session entries and redacted local diagnostics with 7-day retention.
+- No real-time protection, quarantine, driver, automatic malicious/clean verdict or production signing.
 
-Windows uygulamasinda:
+## Build / run
 
-- Tek dosya secme: Windows dosya secici
-- Salt okunur SHA-256 hesaplama (varsayilan dosya limiti: 100 MiB)
-- Basarili, atlanan ve hatali tarama raporu
-- Hash degerini kopyalamaya uygun, salt okunur rapor kutusu
-- Iptal destegi ve tarama sirasinda kilitlenen tekrarli butonlar
-- Oturum icinde en fazla 20 tarama kaydi (bellekte, diske kaydedilmez)
-- Tarama ozeti icin panoya kopyala butonu ve gecmis temizleme
-- Yeni dosyada onceki SHA-256 sonucunu temizleme
-- Acik bir deneysel surum/bagimsiz antivirus uyarisı
+Requires Rust (minimum declared 1.85; CI uses stable).
 
-Windows arayuzu **yalnizca SHA-256 dosya ozeti** hesaplar.
-YARA-X ve trusted publisher altyapisi 0.2.x serisinde ortak
-Core/CLI uzerinde korunur, GUI'ye henuz acilmamistir.
-SHA-256 ozeti tek basina zararlilik karari vermez.
+```bash
+cargo fmt --all -- --check
+cargo clippy --lib --bin turkuazav --tests -- -D warnings
+cargo test --lib --test rust_compat
+cargo run --bin turkuazav -- scan .
+cargo run --features desktop --bin turkuazav-desktop
+```
 
-## Gelistirme
+Developer-only signed rule scan, not an independent production trust root:
 
-.NET 10 SDK gerekir. Windows GUI projesi icin Windows App SDK 2.5.1
-kullanilir. Proje WinUI 3 ve **unpackaged / self-contained**
-derleme ayarlarina sahiptir. Yalnizca Windows x64 hedeflenir.
+```bash
+cargo run --bin turkuazav -- scan-rules TARGET RULES.YAR RULES.SIG PUBLIC.PEM ABSOLUTE_YR_PATH
+```
+
+Real signed YARA-X tests (Windows/Linux x64):
 
 ```powershell
-dotnet restore src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj -p:Platform=x64
-dotnet build src/TurkuazAV.Desktop/TurkuazAV.Desktop.csproj -c Release -p:Platform=x64
-```
-
-WinUI acilis olaylari ve hata turleri, dosya adlari ve tarama ozetleri
-olmadan `%LOCALAPPDATA%\\TurkuazAV\\diagnostics` altina kaydedilir.
-Loglar yerelde tutulur, yedi gun sonra eski dosyalar temizlenir.
-Bu bir gizlilik odakli tani kaydidir; virus uyarisi veya otomatik
-telemetri degildir.
-
-Windows'ta olusan TurkuazAV.Desktop.exe uygulamasi ile dosya
-secebilir ve tek dosya taramasi yapabilirsiniz.
-Bu bir *CI derleme + paket butunlugu dogrulamasi* olup,
-otomatik GUI calistirma
-ve ekrandan test (UI automation) henuz bulunmamaktadir.
-Windows GUI ilk dogrulamasi GitHub-hosted Windows 2022 runner
-uzerinde; Linux ortak motor CI'si eskisi gibi devam eder.
-
-Basarili `main` CI calismalarinda yalnizca **imzasiz yerel test icin**
-`TurkuazAV-0.3.1-UNSIGNED-LOCAL-TEST-win-x64` adli artifact bulunur.
-Tum klasoru cikartip `TurkuazAV.Desktop.exe` dosyasini calistirin.
-Guncel antivirus uyarisini korumayi devre disi birakarak asmayan;
-uygulamayi test makinasi/izole VM ile sinirlandiran bir yontem izleyin.
-
-GitHub Actions, test paketine exe SHA-256 ve gerekli calistirma dosyalari
-kontrolu uygular; ayrica UI report formatter regresyon testleri kosar.
-Bununla birlikte gercek interaktif Windows masaustu acilisi ve dosya
-secici davranisi kullanici makinesinde/Windows VM'de dogrulanmalidir.
-
-## CLI ve guvenlik regresyonlari
-
-```text
-dotnet run --project src/TurkuazAV.Cli -- scan .
-dotnet run --project tests/TurkuazAV.SmokeTests
 pwsh ./tools/install-yarax.ps1
-dotnet run --project tests/TurkuazAV.IntegrationTests
+# With TURKUAZ_YR_PATH exported by CI or manually defined:
+cargo test --test yarax_e2e
 ```
 
-YARA-X entegrasyon testlerinde `TURKUAZ_YR_PATH` dogrulanmis
-`yr` programina yonlendirilmelidir (CI'da installer ayarlar).
+CI: `.github/workflows/rust-ci.yml` on Windows 2022 and Ubuntu 24.04, including native GUI build and unsigned test artifact. CI build **does not** prove interactive GUI startup; manual OS smoke is separately required.
 
-Gelistirici CLI komutu:
+## Security / compatibility
 
-```text
-dotnet run --project src/TurkuazAV.Cli -- scan-rules TARGET RULES.YAR RULES.SIG PUBLIC.PEM ABSOLUTE_YR_PATH
-```
-
-Bu komutun kullanicidan kabul ettigi public key bir uretim
-yayinci guven koku degildir; sadece gelistirme amaclidir.
-Publisher-pinned trusted rule scanner su anda sadece Core
-kutuphane API'sinde ve Windows/Linux E2E regresyonlarinda
-kullanilmaktadir.
-
-## Guvenlik sinirlari
-
-- Henuz gercek zamanli koruma, karantina, driver veya AV verdict yok.
-- Program dosya icerigini silmez/degistirmez; sadece salt-okunur acar.
-- Yeni GUI'de YARA-X motora erisim verilmez: hash raporu uretilir.
-- SHA-256 sonucunun temiz olmasi otomatik olarak guvenilir demek degildir.
-- Dosya taranirken disk icerigi degisebilir.
-- Windows test arayuzu Linux/macOS ile ayni UI degildir;
-  ortak Core degismez. MacOS icin runner henuz yoktur.
-- Public repo icin kaynak kod lisansi henuz secilmemistir.
-
-Mimari: Controller -> Service -> Repo/Tool -> View -> Language + Config.
-
-[Guvenlik modeli](docs/security-model.md).
+See [security model](docs/security-model.md), [migration contract](docs/rust-migration.md) and [desktop preview](docs/windows-desktop-preview.md). The previous .NET v0.3.1 implementation remains available in git history on `main` until this Rust branch is explicitly merged. No automatic release.

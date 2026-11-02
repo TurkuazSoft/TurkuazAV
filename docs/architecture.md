@@ -1,30 +1,22 @@
-# 📄 Dosya Yolu: /TurkuazAV/docs/architecture.md
-# 📌 Amac: Snapshot guvenligi ve gercek YARA-X testlerini belgelemek
-# 📌 Modul - FileType: Architecture - Markdown
-# Version: 0.2.1
-# Aciklama: Snapshot guvenligi ve gercek YARA-X testlerini belgelemek
-# Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
+<!--
+Dosya Yolu: REPO_ROOT/docs/architecture.md
+Amac: Rust core/CLI/desktop sinirlarini belgeler
+Modul - FileType: Documentation - Markdown
+Version: 0.3.1
+Aciklama: Native guvenlik analiz mimarisi
+Bagimli Oldugu Katman: Documentation
+-->
+# Rust Architecture (0.3.1)
 
-# TurkuazAV 0.2.1 Architecture
+- `rust/src/config.rs`: fixed limits and platform-specific YARA-X executable SHA-256 pins
+- `rust/src/scan.rs`: read-only file enumeration, bounded streaming SHA-256, symlink/reparse handling and cancellation
+- `rust/src/rules.rs`: RSA-PSS-SHA256 verification, bounded snapshots, engine hash validation, subprocess timeout/output limit and NDJSON parsing
+- `rust/src/trusted.rs`: strict manifest parser, pinned publisher keyring, canonical signed payload and protected anti-rollback 40-byte format
+- `rust/src/bin/cli.rs`: console controller and textual report
+- `rust/src/bin/desktop.rs`: native UI, in-memory session history, clipboard and privacy-preserving diagnostics
 
-Controller yalnizca komut alir ve Service'e iletir.
-Service imza dogrulamasi ile snapshot olusturmayi yonetir.
-Repository yerel dosyalara ve imzali rule bundle'a erisir.
-Tool kriptografiyi ve YARA-X CLI'yi ayri adaptorlerde uygular.
-View raporlar, Language mesajlari, Config limitleri saklar.
+Rust modules retain logical Controller / Service / Repository / Tool / View / Config separation. No permanent scan history and no automatic malware verdict. YARA-X uses a pinned external executable; integration is deliberately library-controlled and independent of UI. A production-provisioned trust root is still required.
 
-## Guvenli YARA-X
+When copying a mutable target for YARA-X, the snapshot may contain concurrent writes; additional filesystem and process isolation is needed for production antivirus uses.
 
-RSA-PSS-SHA256 dogrulamasi gecmeden kurallar motora verilmez.
-`Directory.CreateTempSubdirectory` gecici tarama kopyalarini barindirir.
-Snapshot, kaynak hedefin motora tekrar okutulmasini onler. Dosya
-kopyalanirken eszamanli yazma olursa butunluk garanti edilmez.
-YARA-X subprocess icin timeout ve ciktinin ust limiti bulunur.
-
-CI `config/yara-x-release.psd1` manifestindeki sabit resmi release
-URL'si ve SHA-256 ozetiyle hem Windows hem Linux binary'lerini dogrular.
-Zararsiz pozitif, negatif ve imza bozulma testleri gercek `yr` ile kosulur.
-
-Uretim eksikleri: yerel motor imza guveni, sabit yayinci anahtari,
-yetki ve sandbox izolasyonu, kapsamli fuzz test, macOS runner,
-gercek zamanli izleme, degisiklik anindaki dosya butunlugu.
+See [migration tests](rust-migration.md) and [security model](security-model.md).
