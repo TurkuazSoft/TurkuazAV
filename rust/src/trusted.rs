@@ -19,7 +19,7 @@ use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
-    path::{Path, PathBuf},
+    path::Path,
 };
 use subtle::ConstantTimeEq;
 
@@ -145,9 +145,11 @@ pub fn accept_version(state_file: &Path, sequence: i64, fingerprint: &[u8; 32]) 
         }
     }
     let mut file: File = OpenOptions::new()
+        
         .read(true)
         .write(true)
         .create(true)
+        .truncate(false)
         .open(state_file)
         .context("Cannot open protected version state")?;
     file.lock_exclusive().context("Cannot lock version state")?;
