@@ -1,0 +1,55 @@
+# Dosya Yolu: REPO_ROOT/Cargo.toml
+# Amac: Rust tabanli TurkuazAV 0.3.1 workspace
+# Modul - FileType: Config - TOML
+# Version: 0.3.1
+# Aciklama: Core, CLI ve opsiyonel native desktop
+# Bagimli Oldugu Katman: Config
+
+[package]
+name = "turkuazav"
+version = "0.3.1"
+edition = "2021"
+rust-version = "1.85"
+license = "UNLICENSED"
+description = "Experimental read-only security analysis tool; not an antivirus"
+
+[lib]
+name = "turkuazav"
+path = "rust/src/lib.rs"
+
+[[bin]]
+name = "turkuazav"
+path = "rust/src/bin/cli.rs"
+
+[[bin]]
+name = "turkuazav-desktop"
+path = "rust/src/bin/desktop.rs"
+required-features = ["desktop"]
+
+[features]
+default = []
+desktop = ["dep:eframe", "dep:rfd", "dep:arboard", "dep:chrono", "dep:dirs"]
+
+[dependencies]
+anyhow = "1"
+hex = "0.4"
+rsa = { version = "0.9", features = ["pem"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = { version = "0.10", features = ["oid"] }
+subtle = "2"
+tempfile = "3"
+walkdir = "2"
+fs2 = "0.4"
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"], optional = true }
+rfd = { version = "0.15", optional = true }
+arboard = { version = "3.4", optional = true }
+chrono = { version = "0.4", optional = true }
+dirs = { version = "6", optional = true }
+
+[dev-dependencies]
+# Tests rely on the same vetted crypto primitives used by the library.
+
+[profile.release]
+strip = true
+lto = "thin"
