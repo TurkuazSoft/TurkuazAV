@@ -1,7 +1,7 @@
 // # 📄 Dosya Yolu: /TurkuazAV/src/TurkuazAV.Cli/config/CliSettings.cs
 // # 📌 Amac: Konsol komutlarini ve cikis kodlarini merkezi tanimlamak
 // # 📌 Modul - FileType: CSharp
-// # Version: 0.2.0
+// # Version: 0.2.1
 // # Aciklama: Konsol komutlarini ve cikis kodlarini merkezi tanimlamak
 // # Bagimli Oldugu Katman: Config
 
@@ -10,6 +10,7 @@ public static class CliSettings
 {
     public const string ScanCommand = "scan";
     public const string ScanRulesCommand = "scan-rules";
+    public const string ScanRulesJsonCommand = "scan-rules-json";
     public const int ScanArgs = 2;
     public const int RuleArgs = 6;
 }
