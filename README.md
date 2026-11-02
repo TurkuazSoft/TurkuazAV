@@ -1,7 +1,7 @@
 # 📄 Dosya Yolu: /TurkuazAV/README.md
 # 📌 Amac: TurkuazAV 0.3.1 GUI ve guvenli tarama test mimarisini tanimlamak
 # 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.3.1
+# Version: 0.3.2
 # Aciklama: WinUI 3 preview ile ortak Windows/Linux tarama altyapisi
 # Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
 
@@ -88,6 +88,34 @@ yayinci guven koku degildir; sadece gelistirme amaclidir.
 Publisher-pinned trusted rule scanner su anda sadece Core
 kutuphane API'sinde ve Windows/Linux E2E regresyonlarinda
 kullanilmaktadir.
+
+## TurkuazInstaller icin tarama kaniti (gelistirme)
+
+`scan-rules-json` komutu .NET Core/CLI tarama motorunu kullanarak
+YARA-X eslesme raporunu `turkuazav.rule-scan.v1` JSON sozlesmesiyle verir:
+
+```text
+turkuazav scan-rules-json TARGET RULES.YAR RULES.SIG PUBLIC.PEM ABSOLUTE_YR_PATH
+```
+
+Basarili taramada stdout tek JSON nesnesi icerir:
+`schema`, `status` (`match` veya `no_match`),
+`sha256` (taranan dosya), `matches` (kural kimlikleri).
+Imza hatasi, motor problemi veya hedefin tarama sirasinda degismesi
+durumunda komut nonzero cikis kodu dondurur; basarili JSON uretmez.
+
+**Dikkat:** `no_match`, virus bulunmadiginin kaniti **degildir**.
+CLI'nin bu gelistirme komutunda yayinci public key yolu kullanici girdisidir.
+Bu, sabitlenmis production trust root'u sayilmaz. Installer adapter'i
+beklenen TurkuazAV binary ve public key SHA-256 degerlerini *ayri guvenilir
+config* uzerinden sabitlemeli; aksi halde rapor kuruluma izin veremez.
+Tam antivirus korumasi, updater, gercek zamanli koruma veya production
+imza guveni ozellikleri bu komutla saglanmaz.
+
+Bu komutun harmless fixture ile Windows/Linux gercek YARA-X E2E
+testleri `tests/TurkuazAV.IntegrationTests/Program.cs` icerisindedir.
+`main` dalina alinmadan once feature branch test artifacti olarak
+degerlendirilmelidir.
 
 ## Guvenlik sinirlari
 
