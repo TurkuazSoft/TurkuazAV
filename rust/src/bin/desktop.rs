@@ -2,7 +2,7 @@
 // Amac: Platformlar arasi Rust GUI 0.3.1 hash preview
 // Modul - FileType: View - Rust
 // Version: 0.3.1
-// Aciklama: Dosya sec, iptal, hash raporu, clipboard, bellek gecmisi, gizli tani
+// Aciklama: Dosya seç, iptal, hash raporu, clipboard, bellek gecmisi, gizli tani
 // Bagimli Oldugu Katman: View | Controller | Service | Tool | Language
 
 use eframe::egui;
@@ -22,7 +22,7 @@ use turkuazav::{scan_file, FileScanResult, ScanStatus};
 
 const HISTORY_LIMIT: usize = 20;
 const PREVIEW_WARNING: &str =
-    "Deneysel tarayici - antivirus korumasi saglamaz. Yalnizca SHA-256 hesaplar.";
+    "Deneysel tarayıcı — antivirüs koruması sağlamaz. Yalnızca SHA-256 hesaplar.";
 
 struct DesktopApp {
     selected: Option<PathBuf>,
@@ -41,7 +41,7 @@ impl Default for DesktopApp {
             busy: false,
             cancel: Arc::new(AtomicBool::new(false)),
             incoming: None,
-            status: "Tarama icin dosya bekleniyor.".into(),
+            status: "Tarama için dosya bekleniyor.".into(),
             report: None,
             history: VecDeque::new(),
         }
@@ -53,7 +53,7 @@ impl DesktopApp {
         if let Some(file) = rfd::FileDialog::new().pick_file() {
             self.selected = Some(file);
             self.report = None; // Old digest must never survive selecting a new target.
-            self.status = "Dosya secildi. Taramaya hazir.".into();
+            self.status = "Dosya seçildi. Taramaya hazır.".into();
         }
     }
 
@@ -70,7 +70,7 @@ impl DesktopApp {
         self.incoming = Some(rx);
         self.report = None;
         self.busy = true;
-        self.status = "SHA-256 hesaplaniyor...".into();
+        self.status = "SHA-256 hesaplanıyor...".into();
         thread::spawn(move || {
             let result = scan_file(&path, &cancelled);
             let _ = tx.send(result);
@@ -88,10 +88,10 @@ impl DesktopApp {
             } else {
                 self.status = match result.status {
                     ScanStatus::Hashed => {
-                        "Tarama tamamlandi. Bu sonuc virus temizligi kaniti degildir."
+                        "Tarama tamamlandı. Bu sonuç virüs temizliği kanıtı değildir."
                     }
-                    ScanStatus::Skipped => "Dosya atlandi.",
-                    ScanStatus::Failed => "Dosya taranamadi.",
+                    ScanStatus::Skipped => "Dosya atlandı.",
+                    ScanStatus::Failed => "Dosya taranamadı.",
                 }
                 .into();
                 let name = result
@@ -123,21 +123,21 @@ impl eframe::App for DesktopApp {
         }
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading(format!("TurkuazAV v{}", env!("CARGO_PKG_VERSION")));
-            ui.strong("DOSYA ANALIZI / RUST PREVIEW");
+            ui.strong("DOSYA ANALİZİ / RUST PREVIEW");
             ui.separator();
             ui.colored_label(egui::Color32::YELLOW, PREVIEW_WARNING);
             ui.add_space(15.0);
             ui.group(|ui| {
-                ui.heading("Dosya secimi");
+                ui.heading("Dosya seçimi");
                 ui.label(
                     self.selected
                         .as_ref()
                         .map(|p| p.display().to_string())
-                        .unwrap_or_else(|| "Henuz dosya secilmedi.".into()),
+                        .unwrap_or_else(|| "Henüz dosya seçilmedi.".into()),
                 );
                 ui.horizontal(|ui| {
                     if ui
-                        .add_enabled(!self.busy, egui::Button::new("Dosya sec"))
+                        .add_enabled(!self.busy, egui::Button::new("Dosya seç"))
                         .clicked()
                     {
                         self.pick();
@@ -152,11 +152,11 @@ impl eframe::App for DesktopApp {
                         self.start();
                     }
                     if ui
-                        .add_enabled(self.busy, egui::Button::new("Iptal"))
+                        .add_enabled(self.busy, egui::Button::new("İptal"))
                         .clicked()
                     {
                         self.cancel.store(true, Ordering::Relaxed);
-                        self.status = "Iptal istendi...".into();
+                        self.status = "İptal istendi...".into();
                     }
                     if self.busy {
                         ui.spinner();
@@ -187,25 +187,25 @@ impl eframe::App for DesktopApp {
                                 .and_then(|mut c| c.set_text(digest.clone()))
                                 .is_ok()
                             {
-                                self.status = "Hash panoya kopyalandi.".into();
+                                self.status = "Hash panoya kopyalandı.".into();
                             } else {
                                 log_event("COPY_FAILED", "ClipboardError");
-                                self.status = "Panoya kopyalanamadi.".into();
+                                self.status = "Panoya kopyalanamadı.".into();
                             }
                         }
                     }
                 } else {
                     ui.label("Rapor yok.");
                 }
-                ui.small("SHA-256 bir guvenlik hukmu degildir.");
+                ui.small("SHA-256 bir güvenlik hükmü değildir.");
             });
             ui.add_space(12.0);
             ui.group(|ui| {
                 ui.heading("Bu oturumdaki taramalar");
-                ui.label("Gecmis sadece bellektedir; diske kaydedilmez.");
-                if ui.button("Oturum gecmisini temizle").clicked() {
+                ui.label("Geçmiş sadece bellektedir; diske kaydedilmez.");
+                if ui.button("Oturum geçmişini temizle").clicked() {
                     self.history.clear();
-                    self.status = "Oturum gecmisi temizlendi.".into();
+                    self.status = "Oturum geçmişi temizlendi.".into();
                 }
                 egui::ScrollArea::vertical()
                     .max_height(150.0)
