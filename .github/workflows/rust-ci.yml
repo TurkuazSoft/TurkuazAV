@@ -9,6 +9,7 @@ name: rust-native-ci
 on:
   push:
     branches:
+      - main
       - feat/rust-native-v0.3.1
   pull_request:
   workflow_dispatch:
@@ -31,18 +32,18 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Check core and CLI
-        run: cargo check --bins
+        run: cargo check --locked --bins
       - name: Rust unit and contract tests
-        run: cargo test --lib --test rust_compat
+        run: cargo test --locked --lib --test rust_compat
       - name: Install pinned official YARA-X
         shell: pwsh
         run: ./tools/install-yarax.ps1
       - name: Rust real YARA-X end-to-end
-        run: cargo test --test yarax_e2e
+        run: cargo test --locked --test yarax_e2e
       - name: Rust lint
-        run: cargo clippy --lib --bin turkuazav --tests -- -D warnings
+        run: cargo clippy --locked --lib --bin turkuazav --tests -- -D warnings
       - name: Build release CLI
-        run: cargo build --release --bin turkuazav
+        run: cargo build --locked --release --bin turkuazav
 
   native-desktop:
     strategy:
@@ -59,9 +60,9 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libxkbcommon-dev libwayland-dev libx11-dev libasound2-dev libudev-dev
       - name: Check Rust GUI
-        run: cargo check --features desktop --bin turkuazav-desktop
+        run: cargo check --locked --features desktop --bin turkuazav-desktop
       - name: Compile native GUI
-        run: cargo build --release --features desktop --bin turkuazav-desktop
+        run: cargo build --locked --release --features desktop --bin turkuazav-desktop
       - name: Verify native test binary and SHA256
         shell: pwsh
         run: |
