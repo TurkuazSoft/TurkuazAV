@@ -34,6 +34,11 @@ jobs:
         run: cargo check --bins
       - name: Rust unit and contract tests
         run: cargo test --lib --test rust_compat
+      - name: Install pinned official YARA-X
+        shell: pwsh
+        run: ./tools/install-yarax.ps1
+      - name: Rust real YARA-X end-to-end
+        run: cargo test --test yarax_e2e
       - name: Rust lint
         run: cargo clippy --lib --bin turkuazav --tests -- -D warnings
       - name: Build release CLI
