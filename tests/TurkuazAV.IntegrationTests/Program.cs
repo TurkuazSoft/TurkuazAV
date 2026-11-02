@@ -1,11 +1,13 @@
 // # 📄 Dosya Yolu: /TurkuazAV/tests/TurkuazAV.IntegrationTests/Program.cs
 // # 📌 Amac: Gercek YARA-X ile pozitif negatif ve bozuk imza akisini dogrulamak
 // # 📌 Modul - FileType: Tests - CSharp
-// # Version: 0.2.4
+// # Version: 0.2.5
 // # Aciklama: Gercek YARA-X ile pozitif negatif ve bozuk imza akisini dogrulamak
 // # Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
+using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text;
 using TurkuazAV.Core.Repositories;
 using TurkuazAV.Core.Language;
@@ -96,6 +98,61 @@ try
         throw new InvalidOperationException(IntegrationSettings.UntrustedEngineAccepted);
 
     await TrustedRuleIntegrationTests.RunAsync(tempRoot, enginePath);
+
+    // BRK-AV-JSON-E2E-001: Real signed YARA-X CLI JSON protocol tests.
+    // The sample marker is deliberately benign; no malware samples are needed.
+    var cli = Path.GetFullPath(Path.Combine(
+        AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+        "src", "TurkuazAV.Cli", "bin", "Release", "net10.0", "TurkuazAV.Cli.dll"));
+    if (!File.Exists(cli))
+        throw new InvalidOperationException("Release CLI assembly not found.");
+
+    await VerifyJsonAsync(positivePath, "match", 1, 0);
+    await VerifyJsonAsync(negativePath, "no_match", 0, 0);
+    await File.WriteAllTextAsync(rulePath, IntegrationSettings.NegativeContent);
+    await VerifyJsonAsync(positivePath, null, 0, 3);
+
+    async Task VerifyJsonAsync(string file, string? expected, int count, int expectedExit)
+    {
+        var start = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var part in new[]
+        {
+            cli, "scan-rules-json", file, rulePath, signaturePath, keyPath, enginePath
+        })
+            start.ArgumentList.Add(part);
+
+        using var process = Process.Start(start)
+            ?? throw new InvalidOperationException("Could not start the CLI test.");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+        var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
+        await Task.WhenAll(stdout, stderr, process.WaitForExitAsync(timeout.Token));
+        if (process.ExitCode != expectedExit)
+            throw new InvalidOperationException($"Unexpected JSON CLI exit code {process.ExitCode}: {stderr.Result}");
+        if (expected is null)
+        {
+            if (!string.IsNullOrWhiteSpace(stdout.Result))
+                throw new InvalidOperationException("Failed scan returned success JSON.");
+            return;
+        }
+
+        using var parsed = JsonDocument.Parse(stdout.Result);
+        var evidence = parsed.RootElement;
+        if (evidence.GetProperty("schema").GetString() != "turkuazav.rule-scan.v1"
+            || evidence.GetProperty("status").GetString() != expected
+            || evidence.GetProperty("matches").GetArrayLength() != count)
+            throw new InvalidOperationException("JSON scan report schema or status mismatch.");
+        var expectedHash = Convert.ToHexString(
+            SHA256.HashData(await File.ReadAllBytesAsync(file))).ToLowerInvariant();
+        if (evidence.GetProperty("sha256").GetString() != expectedHash)
+            throw new InvalidOperationException("JSON scan report file hash mismatch.");
+    }
 
     Console.WriteLine(IntegrationSettings.TestsPassed);
     return 0;

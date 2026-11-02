@@ -1,7 +1,7 @@
 # 📄 Dosya Yolu: /TurkuazAV/.github/workflows/ci.yml
 # 📌 Amac: Windows Linux motor testleri ve Windows WinUI 3 derleme kontrolu
 # 📌 Modul - FileType: CI - YAML
-# Version: 0.3.1
+# Version: 0.3.2
 # Aciklama: GitHub-hosted runner uzerinde WinUI build ve ortak core E2E
 # Bagimli Oldugu Katman: Tool | Config
 
@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - main
+      - feat/installer-rule-scan-protocol
   pull_request:
 
 permissions:
