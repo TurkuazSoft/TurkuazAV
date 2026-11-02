@@ -145,7 +145,6 @@ pub fn accept_version(state_file: &Path, sequence: i64, fingerprint: &[u8; 32]) 
         }
     }
     let mut file: File = OpenOptions::new()
-        
         .read(true)
         .write(true)
         .create(true)
