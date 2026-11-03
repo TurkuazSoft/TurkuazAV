@@ -16,7 +16,7 @@ TurkuazAV is a **read-only experimental file analysis tool**, **not an antivirus
 - **Rust CLI**: `scan` and developer-only `scan-rules` commands.
 - **YARA-X**: verifies RSA-PSS-SHA256 rule signature, snapshots rules and target, verifies pinned executable SHA-256 (Windows/Linux x64), bounded output and timeout.
 - **Trusted publisher API**: independent pinned keyring, strict four-field manifest, canonical payload, signed rule digest and persistent 40-byte anti-rollback state (same contract as .NET 0.2.4).
-- **Rust Desktop**: cross-platform egui GUI for *single file SHA-256 only*, file picker, cancel, read-only digest report, clipboard copy, maximum 20 in-memory session entries and redacted local diagnostics with 7-day retention.
+- **Rust Desktop**: cross-platform egui GUI for read-only *file or folder SHA-256* scanning, file/folder picker, cancel, live progress counters, last-file digest report, clipboard copy, maximum 20 in-memory session entries and redacted local diagnostics with 7-day retention. This is not a malware verdict.
 - No real-time protection, quarantine, driver, automatic malicious/clean verdict or production signing.
 
 ## Build / run

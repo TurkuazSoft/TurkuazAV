@@ -12,23 +12,56 @@ use std::{
     io::Write,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc::{self, Receiver},
         Arc,
     },
     thread,
 };
-use turkuazav::{scan_file, FileScanResult, ScanStatus};
+use turkuazav::{scan_path_each, FileScanResult, ScanStatus};
 
 const HISTORY_LIMIT: usize = 20;
 const PREVIEW_WARNING: &str =
     "Deneysel tarayıcı — antivirüs koruması sağlamaz. Yalnızca SHA-256 hesaplar.";
 
+#[derive(Default)]
+struct ScanProgress {
+    hashed: AtomicUsize,
+    skipped: AtomicUsize,
+    failed: AtomicUsize,
+}
+
+impl ScanProgress {
+    fn record(&self, status: &ScanStatus) {
+        let counter = match status {
+            ScanStatus::Hashed => &self.hashed,
+            ScanStatus::Skipped => &self.skipped,
+            ScanStatus::Failed => &self.failed,
+        };
+        counter.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn counts(&self) -> (usize, usize, usize) {
+        (
+            self.hashed.load(Ordering::Relaxed),
+            self.skipped.load(Ordering::Relaxed),
+            self.failed.load(Ordering::Relaxed),
+        )
+    }
+}
+
+struct ScanOutcome {
+    report: Option<FileScanResult>,
+    history: VecDeque<String>,
+    traversal_error: Option<String>,
+}
+
 struct DesktopApp {
     selected: Option<PathBuf>,
     busy: bool,
     cancel: Arc<AtomicBool>,
-    incoming: Option<Receiver<FileScanResult>>,
+    incoming: Option<Receiver<ScanOutcome>>,
+    progress: Arc<ScanProgress>,
     status: String,
     report: Option<FileScanResult>,
     history: VecDeque<String>,
@@ -41,6 +74,7 @@ impl Default for DesktopApp {
             busy: false,
             cancel: Arc::new(AtomicBool::new(false)),
             incoming: None,
+            progress: Arc::new(ScanProgress::default()),
             status: "Tarama için dosya bekleniyor.".into(),
             report: None,
             history: VecDeque::new(),
@@ -49,11 +83,21 @@ impl Default for DesktopApp {
 }
 
 impl DesktopApp {
+    fn choose(&mut self, path: PathBuf) {
+        self.selected = Some(path);
+        self.report = None; // Old digest must never survive selecting a new target.
+        self.status = "Seçim yapıldı. Taramaya hazır.".into();
+    }
+
     fn pick(&mut self) {
         if let Some(file) = rfd::FileDialog::new().pick_file() {
-            self.selected = Some(file);
-            self.report = None; // Old digest must never survive selecting a new target.
-            self.status = "Dosya seçildi. Taramaya hazır.".into();
+            self.choose(file);
+        }
+    }
+
+    fn pick_folder(&mut self) {
+        if let Some(folder) = rfd::FileDialog::new().pick_folder() {
+            self.choose(folder);
         }
     }
 
@@ -65,22 +109,46 @@ impl DesktopApp {
             return;
         }
         self.cancel = Arc::new(AtomicBool::new(false));
+        self.progress = Arc::new(ScanProgress::default());
         let cancelled = Arc::clone(&self.cancel);
+        let progress = Arc::clone(&self.progress);
         let (tx, rx) = mpsc::channel();
         self.incoming = Some(rx);
         self.report = None;
         self.busy = true;
-        self.status = "SHA-256 hesaplanıyor...".into();
+        self.status = "SHA-256 taraması yapılıyor...".into();
         thread::spawn(move || {
-            let result = scan_file(&path, &cancelled);
-            let _ = tx.send(result);
+            // No unbounded result Vec or per-file message queue.
+            let mut report = None;
+            let mut history = VecDeque::with_capacity(HISTORY_LIMIT);
+            let outcome = scan_path_each(&path, &cancelled, |result| {
+                progress.record(&result.status);
+                let name = result
+                    .path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy();
+                history.push_front(format!(
+                    "{} | {} | {:?}",
+                    chrono::Local::now().format("%Y-%m-%d %H:%M"),
+                    name,
+                    result.status
+                ));
+                history.truncate(HISTORY_LIMIT);
+                report = Some(result);
+                Ok(())
+            });
+            let _ = tx.send(ScanOutcome {
+                report,
+                history,
+                traversal_error: outcome.err().map(|error| error.to_string()),
+            });
         });
     }
 
     fn poll(&mut self) {
         let received = self.incoming.as_ref().map(|rx| rx.try_recv());
         if matches!(received, Some(Err(mpsc::TryRecvError::Disconnected))) {
-            // A panic or early exit in the worker must never leave GUI controls locked.
             self.busy = false;
             self.incoming = None;
             self.report = None;
@@ -92,37 +160,31 @@ impl DesktopApp {
             }
             return;
         }
-        if let Some(Ok(result)) = received {
+        if let Some(Ok(outcome)) = received {
             self.busy = false;
             self.incoming = None;
             if self.cancel.load(Ordering::Relaxed) {
+                // Incomplete scans never surface a previous/partial successful hash.
                 self.status = "Tarama iptal edildi.".into();
                 self.report = None;
+            } else if outcome.traversal_error.is_some() {
+                log_event("SCAN_FAILED", "TraversalError");
+                self.status = "Tarama tamamlanamadı. Yeniden deneyin.".into();
+                self.report = None;
             } else {
-                self.status = match result.status {
-                    ScanStatus::Hashed => {
-                        "Tarama tamamlandı. Bu sonuç virüs temizliği kanıtı değildir."
-                    }
-                    ScanStatus::Skipped => "Dosya atlandı.",
-                    ScanStatus::Failed => "Dosya taranamadı.",
+                let (hashed, skipped, failed) = self.progress.counts();
+                self.status = format!(
+                    "Tarama tamamlandı: {} işlendi, {} atlandı, {} hata. Sonuç antivirüs temizliği kanıtı değildir.",
+                    hashed, skipped, failed
+                );
+                for item in outcome.history.into_iter().rev() {
+                    self.history.push_front(item);
                 }
-                .into();
-                let name = result
-                    .path
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy();
-                self.history.push_front(format!(
-                    "{} | {} | {:?}",
-                    chrono::Local::now().format("%Y-%m-%d %H:%M"),
-                    name,
-                    result.status
-                ));
                 self.history.truncate(HISTORY_LIMIT);
-                if result.status == ScanStatus::Failed {
+                if failed > 0 {
                     log_event("SCAN_FAILED", "ScanError");
                 }
-                self.report = Some(result);
+                self.report = outcome.report;
             }
         }
     }
@@ -141,12 +203,12 @@ impl eframe::App for DesktopApp {
             ui.colored_label(egui::Color32::YELLOW, PREVIEW_WARNING);
             ui.add_space(15.0);
             ui.group(|ui| {
-                ui.heading("Dosya seçimi");
+                ui.heading("Dosya veya klasör seçimi");
                 ui.label(
                     self.selected
                         .as_ref()
                         .map(|p| p.display().to_string())
-                        .unwrap_or_else(|| "Henüz dosya seçilmedi.".into()),
+                        .unwrap_or_else(|| "Henüz dosya veya klasör seçilmedi.".into()),
                 );
                 ui.horizontal(|ui| {
                     if ui
@@ -154,6 +216,12 @@ impl eframe::App for DesktopApp {
                         .clicked()
                     {
                         self.pick();
+                    }
+                    if ui
+                        .add_enabled(!self.busy, egui::Button::new("Klasör seç"))
+                        .clicked()
+                    {
+                        self.pick_folder();
                     }
                     if ui
                         .add_enabled(
@@ -176,6 +244,13 @@ impl eframe::App for DesktopApp {
                     }
                 });
                 ui.label(&self.status);
+                if self.busy {
+                    let (hashed, skipped, failed) = self.progress.counts();
+                    ui.label(format!(
+                        "İlerleme: {} işlendi, {} atlandı, {} hata.",
+                        hashed, skipped, failed
+                    ));
+                }
             });
             ui.add_space(12.0);
             ui.group(|ui| {
@@ -299,6 +374,31 @@ mod tests {
         assert!(app.incoming.is_none());
         assert!(app.report.is_none());
         assert!(app.status.contains("Yeniden deneyin"));
+    }
+
+    #[test]
+    fn folder_worker_streams_results_and_limits_history() {
+        let temp = tempfile::tempdir().unwrap();
+        for index in 0..30 {
+            fs::write(temp.path().join(format!("file-{index:02}.txt")), b"abc").unwrap();
+        }
+        let mut app = DesktopApp {
+            selected: Some(temp.path().to_path_buf()),
+            ..DesktopApp::default()
+        };
+        app.start();
+        for _ in 0..300 {
+            app.poll();
+            if !app.busy {
+                break;
+            }
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(!app.busy, "folder scan worker did not finish");
+        assert_eq!(app.progress.counts(), (30, 0, 0));
+        assert_eq!(app.history.len(), HISTORY_LIMIT);
+        assert!(app.report.is_some());
+        assert!(app.status.contains("30 işlendi"));
     }
 
     #[test]
