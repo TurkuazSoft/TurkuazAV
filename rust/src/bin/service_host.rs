@@ -362,7 +362,9 @@ fn run(args: &[OsString]) -> Result<()> {
 
             host_foreground(&settings, || {
                 println!("SERVICE_HOST=READY version={}", env!("CARGO_PKG_VERSION"));
-                std::io::stdout().flush().context("Cannot flush service readiness")?;
+                std::io::stdout()
+                    .flush()
+                    .context("Cannot flush service readiness")?;
                 Ok(())
             })
         }
