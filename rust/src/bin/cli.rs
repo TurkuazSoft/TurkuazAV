@@ -5,14 +5,7 @@
 // Aciklama: Scan ve developer-only scan-rules kontrati
 // Bagimli Oldugu Katman: Controller | Service | View
 
-use std::{
-    env,
-    path::Path,
-    process::ExitCode,
-    sync::atomic::AtomicBool,
-    thread,
-    time::Duration,
-};
+use std::{env, path::Path, process::ExitCode, sync::atomic::AtomicBool, thread, time::Duration};
 use anyhow::Context;
 use turkuazav::{scan_path_each, scan_rules, ChangeKind, DirectoryObserver, ScanStatus};
 

@@ -12,8 +12,7 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use std::{
     collections::BTreeMap,
-    fs,
-    io,
+    fs, io,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -51,7 +50,9 @@ fn inventory(
                 if files.len() >= max_files {
                     bail!("Observer file count limit exceeded");
                 }
-                let hash = item.sha256.context("Missing SHA-256 from successful scan")?;
+                let hash = item
+                    .sha256
+                    .context("Missing SHA-256 from successful scan")?;
                 files.insert(item.path, hash);
             }
             // Skipped files are not covered; if a previously tracked file
