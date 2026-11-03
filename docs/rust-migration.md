@@ -42,7 +42,7 @@ Gerçek YARA-X E2E için doğrulanmış motoru yükleyin ve `TURKUAZ_YR_PATH` ta
 cargo test --locked --test yarax_e2e
 ```
 
-CI `tools/package-rust-preview.ps1` ile test ZIP/TAR.GZ paketini açıp **her kritik dosyayı sayar ve SHA-256 kontrolü** yapar. Ayrı `.sha256` dosyası arşivin tamamını korumak için sağlanır. Ne checksum ne de imzasız paket, kod imzası veya AV sınıflandırması yerine geçer.
+CI `tools/package-rust-preview.ps1` ile test ZIP/TAR.GZ paketini acip **her kritik dosyayi sayar ve SHA-256 kontrolu** yapar. Paket icinden cikartilan gercek CLI farkli Unicode calisma dizininden baslatilir; SHA-256 ornegi ve ozet cikti kontrati dogrulanir. Ayrı `.sha256` dosyası arşivin tamamını korumak için sağlanır. Ne checksum ne de imzasız paket, kod imzası veya AV sınıflandırması yerine geçer.
 
 ## Manuel test kapıları
 

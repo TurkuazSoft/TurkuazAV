@@ -96,6 +96,33 @@ try {
         $actualHash = (Get-FileHash -LiteralPath (Join-Path $verify $filename) -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($actualHash -cne $hash) { throw "Archive SHA256 mismatch: $filename" }
     }
+    # Execute the unpacked CLI from an unrelated Unicode working directory.
+    # A parseable archive alone does not prove the shipped executable works.
+    $smokeDir = Join-Path $output ("_native_cli_smoke_" + [char]0x0130)
+    New-Item -ItemType Directory -Path $smokeDir -Force | Out-Null
+    try {
+        $sample = Join-Path $smokeDir 'sample.txt'
+        [System.IO.File]::WriteAllBytes($sample, [byte[]](0x61, 0x62, 0x63))
+        $binary = Join-Path $verify "turkuazav$extension"
+        Push-Location $smokeDir
+        try {
+            $outputText = (& $binary scan $sample 2>&1 | Out-String)
+            if ($LASTEXITCODE -ne 0) { throw 'Unpacked CLI scan failed.' }
+            if ($outputText -notmatch 'BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD') {
+                throw 'Unpacked CLI hash output differs from expected SHA-256.'
+            }
+            if ($outputText -notmatch 'Summary: hashed=1, skipped=0, failed=0') {
+                throw 'Unpacked CLI summary contract failed.'
+            }
+        } finally {
+            Pop-Location
+        }
+        Write-Host 'RUST_NATIVE_PACKAGE_CLI_SMOKE=PASS'
+    } finally {
+        if (Test-Path -LiteralPath $smokeDir) {
+            Remove-Item -LiteralPath $smokeDir -Recurse -Force
+        }
+    }
     $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
     $digestFile = "$archive.sha256"
     [System.IO.File]::WriteAllText($digestFile, "$archiveHash  $(Split-Path $archive -Leaf)" + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
