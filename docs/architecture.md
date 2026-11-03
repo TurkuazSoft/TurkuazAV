@@ -12,6 +12,7 @@ Bagimli Oldugu Katman: Documentation
 - `rust/src/scan.rs`: read-only file enumeration, bounded streaming SHA-256, symlink/reparse handling and cancellation
 - `rust/src/monitor.rs`: bounded read-only SHA-256 directory polling and in-memory delta state
 - `rust/src/native_events.rs`: opt-in Windows recursive change notification / Linux inotify root notification hint adapter; periodic full-tree polling fallback remains authoritative, no daemon or blocking hook
+- `rust/src/service.rs`: bounded one-slot atomic reconciliation request, independent trigger handle, failure/cancel replay, root-scoped scanning; no installed OS service yet
 - `rust/src/rules.rs`: RSA-PSS-SHA256 verification, bounded snapshots, engine hash validation, subprocess timeout/output limit and NDJSON parsing
 - `rust/src/trusted.rs`: strict manifest parser, pinned publisher keyring, canonical signed payload and protected anti-rollback 40-byte format
 - `rust/src/bin/cli.rs`: console controller and textual report

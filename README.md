@@ -37,6 +37,8 @@ Optional foreground observer preview (a fixed number of cycles, no daemon or aut
 cargo run --bin turkuazav -- observe ./my-directory 3 2
 ```
 
+The service-core coordinator (`rust/src/service.rs`) coalesces repeated event hints into **one pending full-tree rescan**, without buffering raw paths. A failed or cancelled rescan remains pending for retry; requests arriving during a scan remain pending. This is a synchronous, read-only core designed for a future supervised worker, **not** an installed, privileged or protected OS service.
+
 Native change notification preview (also foreground and bounded):
 
 ```bash

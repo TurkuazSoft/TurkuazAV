@@ -15,7 +15,7 @@ Bagimli Oldugu Katman: Documentation
 | Eski bileşen | Rust karşılığı | Kanıt |
 | --- | --- | --- |
 | SHA-256 sınırlı tarama | `rust/src/scan.rs` | Rust birim, akış tabanlı klasör taraması, skip/iptal ve bağlantı testleri |
-| Yeni gozlem onizlemesi (v0.3.1'e ilave) | `rust/src/monitor.rs` / `rust/src/native_events.rs` | Salt okunur polling + native ipucu, ekleme/degisme/silme, dosya limiti, iptal ve platform olay testleri |
+| Yeni gozlem onizlemesi (v0.3.1'e ilave) | `rust/src/monitor.rs` / `rust/src/native_events.rs` / `rust/src/service.rs` | Salt okunur polling + native ipucu, tek-slot kuyruk, replay, ekleme/degisme/silme, iptal ve platform olay testleri |
 | CLI `scan` | `rust/src/bin/cli.rs` | Gerçek binary stdout, hash ve exit-code smoke |
 | CLI `scan-rules` | `rust/src/rules.rs` | RSA-PSS, pinned YARA-X, snapshot, iptal ve pozitif/negatif E2E |
 | Trusted manifest | `rust/src/trusted.rs` | Strict schema, imza ve hash regresyonları |
@@ -53,6 +53,7 @@ Windows ve Linux gerçek oturumlarında dosya seçici, uzun taramanın iptali, p
 
 - SHA-256 veya YARA-X kural eşleşmesi antivirüsün temiz/zararlı kararı değildir.
 - Salt okunur, kullanici talebiyle baslayan `observe` polling komutu eklendi; OS olay kancasi, servis, dosya engelleme veya virus temizleme degildir. Araliklar arasindaki gecici degisiklikler kaybolabilir.
+- Tek-slot servis cekirdegi eklendi; kurulu veya korumali Windows Service / systemd birimi, otomatik baslatma, sandbox, saglik denetimi ve kalici kayit yoktur.
 - Gerçek zamanlı koruma, karantina, silme ve kernel sürücüsü v0.3.1 kapsamına dahil değildir.
 - Publisher anahtar kökü henüz üretim için güvenli şekilde provision edilmedi; CLI'da verilen PEM güven kökü sayılamaz.
 - Özel geçici alana alınmış YARA-X kopyası için dosya bütünlüğü doğrulanır; ancak yönetici ayrıcalığına sahip saldırganlara karşı süreç ve dosya izolasyonu tamamlanmadı. Korumali dizinde 40-byte surum state'i atomik yenilenir; ayricalikli state rollback'e, dosya snapshot TOCTOU'ya, subprocess sandbox/child-tree temizligine ve elektrik kesintisi durumlarina ek sertlestirme gerekir.

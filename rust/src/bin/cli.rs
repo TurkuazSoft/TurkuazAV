@@ -8,7 +8,8 @@
 use anyhow::Context;
 use std::{env, path::Path, process::ExitCode, sync::atomic::AtomicBool, thread, time::Duration};
 use turkuazav::{
-    scan_path_each, scan_rules, ChangeKind, DirectoryObserver, NativeChangeWakeup, ScanStatus,
+    scan_path_each, scan_rules, ChangeKind, DirectoryObserver, NativeChangeWakeup,
+    ScanCoordinator, ScanStatus,
 };
 
 fn usage() {
@@ -56,13 +57,14 @@ fn run(args: &[String]) -> anyhow::Result<u8> {
                 "Observe cycles or interval outside safe bounds"
             );
             let cancel = AtomicBool::new(false);
-            let mut observer = DirectoryObserver::new(Path::new(root), &cancel)?;
+            let mut coordinator =
+                ScanCoordinator::new(DirectoryObserver::new(Path::new(root), &cancel)?);
             let mut wakeup = if verb == "observe-events" {
-                Some(NativeChangeWakeup::new(observer.root())?)
+                Some(NativeChangeWakeup::new(coordinator.root())?)
             } else {
                 None
             };
-            println!("BASELINE | {} tracked files", observer.tracked_files());
+            println!("BASELINE | {} tracked files", coordinator.tracked_files());
             let mut total = 0usize;
             for _ in 0..cycles {
                 if let Some(watcher) = &mut wakeup {
@@ -70,7 +72,10 @@ fn run(args: &[String]) -> anyhow::Result<u8> {
                 } else {
                     thread::sleep(Duration::from_secs(interval));
                 }
-                let changes = observer.poll(&cancel)?;
+                coordinator.signal().request();
+                let changes = coordinator
+                    .run_pending(&cancel)?
+                    .context("Missing queued reconciliation")?;
                 for change in &changes {
                     let label = match change.kind {
                         ChangeKind::Added => "ADDED",
