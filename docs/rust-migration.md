@@ -53,6 +53,6 @@ Windows ve Linux gerçek oturumlarında dosya seçici, uzun taramanın iptali, p
 - SHA-256 veya YARA-X kural eşleşmesi antivirüsün temiz/zararlı kararı değildir.
 - Gerçek zamanlı koruma, karantina, silme ve kernel sürücüsü v0.3.1 kapsamına dahil değildir.
 - Publisher anahtar kökü henüz üretim için güvenli şekilde provision edilmedi; CLI'da verilen PEM güven kökü sayılamaz.
-- YARA-X executable hash/execute yarışına, ayrıcalıklı state rollback'e, dosya snapshot TOCTOU'ya, subprocess sandbox/child-tree temizliğine ve elektrik kesintisi durumlarına ek sertleştirme gerekir.
+- Özel geçici alana alınmış YARA-X kopyası için dosya bütünlüğü doğrulanır; ancak yönetici ayrıcalığına sahip saldırganlara karşı süreç ve dosya izolasyonu tamamlanmadı. Ayrıcalıklı state rollback'e, dosya snapshot TOCTOU'ya, subprocess sandbox/child-tree temizliğine ve elektrik kesintisi durumlarına ek sertleştirme gerekir.
 - macOS engine pin ve macOS CI henüz yoktur; platform destek iddiası olmamalıdır.
 - Bu dal production sürüm değildir: `main` birleştirme, imzalama ve release ayrı onay gerektirir.

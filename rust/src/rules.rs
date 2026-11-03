@@ -122,9 +122,36 @@ fn read_pipe(mut input: impl Read) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+/// Makes the bytes to be executed independent of a mutable engine path.
+/// The private copy is checked *after* copying; a hash of the original path
+/// would leave a verify/execute race.
+fn stage_engine(engine: &Path, private_dir: &Path) -> Result<PathBuf> {
+    if !engine.is_absolute() {
+        bail!("YARA-X executable path must be absolute");
+    }
+    let meta = fs::symlink_metadata(engine).context("YARA-X engine missing")?;
+    if is_reparse_or_symlink(&meta) || !meta.is_file() {
+        bail!("YARA-X engine path is not a regular file");
+    }
+    if meta.len() > config::MAX_ENGINE_BYTES {
+        bail!("YARA-X executable size limit exceeded");
+    }
+    let staged = private_dir.join(if cfg!(windows) { "yr.exe" } else { "yr" });
+    let copied = fs::copy(engine, &staged).context("Cannot copy YARA-X engine")?;
+    if copied > config::MAX_ENGINE_BYTES {
+        bail!("YARA-X executable size limit exceeded");
+    }
+    // The staged executable, not the untrusted source path, is what gets run.
+    verify_engine(&staged)?;
+    Ok(staged)
+}
+
 pub fn run_engine(engine: &Path, rules: &Path, target: &Path) -> Result<Vec<String>> {
-    verify_engine(engine)?;
-    let mut child = Command::new(engine)
+    let private_dir = tempfile::Builder::new()
+        .prefix("TurkuazAV-Engine-")
+        .tempdir()?;
+    let staged = stage_engine(engine, private_dir.path())?;
+    let mut child = Command::new(&staged)
         .arg("scan")
         .arg("--output-format=ndjson")
         .arg(rules)
@@ -252,6 +279,30 @@ mod tests {
             &f
         )
         .is_err());
+    }
+    #[test]
+    fn staged_engine_fails_closed_for_untrusted_bytes() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("fake-yr");
+        let folder = temp.path().join("private");
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(&source, b"not the pinned YARA-X release").unwrap();
+        assert!(stage_engine(&source, &folder).is_err());
+        let staged = folder.join(if cfg!(windows) { "yr.exe" } else { "yr" });
+        assert!(staged.exists());
+        assert_eq!(fs::read(staged).unwrap(), b"not the pinned YARA-X release");
+    }
+    #[test]
+    fn oversized_engine_rejected_before_staging() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("huge-yr");
+        let folder = temp.path().join("private");
+        fs::create_dir_all(&folder).unwrap();
+        File::create(&source)
+            .unwrap()
+            .set_len(config::MAX_ENGINE_BYTES + 1)
+            .unwrap();
+        assert!(stage_engine(&source, &folder).is_err());
     }
     #[test]
     fn wrong_engine_rejected() {

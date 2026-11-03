@@ -16,7 +16,7 @@ This v0.3.1 experimental implementation is not a full antivirus. It does not pro
 2. Strict manifest fields: `schema`, `sequence` (positive signed 64-bit integer), `keyId`, `rulesSha256` (64 lower-case hex characters).
 3. Canonical RSA-PSS-SHA256 signature input: `TurkuazAV.rule-package.v1\n<sequence>\n<keyId>\n<rulesSha256>\n`.
 4. Verify key ID and RSA key strength (at least 2048-bit), signature and content hash before providing rule bytes to the engine.
-5. Store verified rule bytes and bounded target snapshot in a temporary private directory; verify pinned official YARA-X executable digest before spawning it.
+5. Store verified rule bytes and bounded target snapshot in a temporary private directory; stage a bounded private executable copy and verify **the staged bytes** against the pinned official YARA-X SHA-256 before spawning it.
 6. Only after successful real engine execution and validated NDJSON output, commit the anti-rollback state.
 7. Persistent state has exactly 40 bytes: 8-byte little-endian positive sequence + 32-byte SHA-256 canonical-payload fingerprint. Older sequences and same-sequence/different-payload are denied. Invalid/legacy 8-byte records fail closed.
 
@@ -24,6 +24,6 @@ The storage location must be protected by host permissions; file locking does no
 
 ## Incomplete production controls
 
-Publisher trust-root provisioning, secure signed key rotation, protected service installation, process sandboxing and full process-tree termination, engine hash/execute race mitigation, target filesystem TOCTOU hardening, atomic state update/power-loss tests, fuzz and performance coverage, real interactive GUI smoke, production signing, quarantine and real-time blocking.
+Publisher trust-root provisioning, secure signed key rotation, protected service installation, process sandboxing and full process-tree termination, remaining local privilege/temporary-directory tamper hardening, target filesystem TOCTOU hardening, atomic state update/power-loss tests, fuzz and performance coverage, real interactive GUI smoke, production signing, quarantine and real-time blocking.
 
 Do not run unsigned preview artifacts as the device's only endpoint protection.
