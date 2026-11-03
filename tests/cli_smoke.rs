@@ -74,3 +74,47 @@ fn unicode_directory_scan_from_unrelated_working_directory_streams_results() {
     assert!(stdout.contains("SKIP |"));
     assert!(stdout.contains("Summary: hashed=2, skipped=1, failed=0"));
 }
+
+#[test]
+fn bounded_read_only_observer_cli_runs_from_unrelated_working_directory() {
+    let temp = tempfile::tempdir().unwrap();
+    let watched = temp.path().join("İzlenen klasör");
+    fs::create_dir_all(&watched).unwrap();
+    fs::write(watched.join("example.txt"), b"abc").unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_turkuazav"))
+        .arg("observe")
+        .arg(&watched)
+        .args(["1", "1"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.contains("BASELINE | 1 tracked files"));
+    assert!(text.contains("Observe: changes=0, cycles=1"));
+    assert!(!text.contains("ADDED |"));
+}
+
+#[test]
+fn observer_cli_rejects_unbounded_cycles_and_missing_directory() {
+    let temp = tempfile::tempdir().unwrap();
+    let exceeded = Command::new(env!("CARGO_BIN_EXE_turkuazav"))
+        .arg("observe")
+        .arg(temp.path())
+        .args(["999", "1"])
+        .output()
+        .unwrap();
+    assert!(!exceeded.status.success());
+    let missing = Command::new(env!("CARGO_BIN_EXE_turkuazav"))
+        .arg("observe")
+        .arg(temp.path().join("not-there"))
+        .args(["1", "1"])
+        .output()
+        .unwrap();
+    assert!(!missing.status.success());
+}

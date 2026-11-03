@@ -12,6 +12,8 @@ pub const MAX_PUBLIC_KEY_BYTES: usize = 16_384;
 pub const MAX_MANIFEST_BYTES: usize = 16_384;
 pub const MAX_OUTPUT_BYTES: usize = 262_144;
 pub const MAX_ENGINE_BYTES: u64 = 268_435_456;
+/// Observer memory bound; each sampled file also obeys MAX_FILE_SIZE.
+pub const MAX_MONITORED_FILES: usize = 4096;
 pub const BUFFER_SIZE: usize = 81_920;
 pub const ENGINE_TIMEOUT_SECONDS: u64 = 30;
 pub const PACKAGE_SCHEMA: &str = "turkuazav.rule-package.v1";

@@ -5,11 +5,18 @@
 // Aciklama: Scan ve developer-only scan-rules kontrati
 // Bagimli Oldugu Katman: Controller | Service | View
 
-use std::{env, path::Path, process::ExitCode, sync::atomic::AtomicBool};
-use turkuazav::{scan_path_each, scan_rules, ScanStatus};
+use std::{
+    env,
+    path::Path,
+    process::ExitCode,
+    sync::atomic::AtomicBool,
+    thread,
+    time::Duration,
+};
+use turkuazav::{scan_path_each, scan_rules, ChangeKind, DirectoryObserver, ScanStatus};
 
 fn usage() {
-    println!("Usage: turkuazav scan <file-or-directory> OR turkuazav scan-rules <target> <rules.yar> <rules.sig> <public.pem> <absolute-yr-path>");
+    println!("Usage: turkuazav scan <file-or-directory> OR turkuazav scan-rules <target> <rules.yar> <rules.sig> <public.pem> <absolute-yr-path> OR turkuazav observe <directory> <cycles:1..20> <interval-seconds:1..60>");
 }
 
 fn run(args: &[String]) -> anyhow::Result<u8> {
@@ -44,6 +51,38 @@ fn run(args: &[String]) -> anyhow::Result<u8> {
                 hashed, skipped, failed
             );
             Ok(if failed > 0 { 1 } else { 0 })
+        }
+        [verb, root, cycles, interval] if verb == "observe" => {
+            let cycles: u32 = cycles.parse().context("Invalid observe cycle count")?;
+            let interval: u64 = interval.parse().context("Invalid observe interval")?;
+            anyhow::ensure!(
+                (1..=20).contains(&cycles) && (1..=60).contains(&interval),
+                "Observe cycles or interval outside safe bounds"
+            );
+            let cancel = AtomicBool::new(false);
+            let mut observer = DirectoryObserver::new(Path::new(root), &cancel)?;
+            println!("BASELINE | {} tracked files", observer.tracked_files());
+            let mut total = 0usize;
+            for _ in 0..cycles {
+                thread::sleep(Duration::from_secs(interval));
+                let changes = observer.poll(&cancel)?;
+                for change in &changes {
+                    let label = match change.kind {
+                        ChangeKind::Added => "ADDED",
+                        ChangeKind::Modified => "MODIFIED",
+                        ChangeKind::Removed => "REMOVED",
+                    };
+                    println!(
+                        "{} | {} | {}",
+                        label,
+                        change.path.display(),
+                        change.sha256.as_deref().unwrap_or("-")
+                    );
+                }
+                total += changes.len();
+            }
+            println!("Observe: changes={total}, cycles={cycles}");
+            Ok(0)
         }
         [verb, target, rules, signature, key, engine] if verb == "scan-rules" => {
             let result = scan_rules(

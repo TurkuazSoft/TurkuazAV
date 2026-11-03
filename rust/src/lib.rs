@@ -6,10 +6,12 @@
 // Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
 pub mod config;
+pub mod monitor;
 pub mod rules;
 pub mod scan;
 pub mod trusted;
 
+pub use monitor::{ChangeKind, DirectoryObserver, ObservedChange};
 pub use rules::{
     parse_yarax_output, scan_rules, scan_rules_with_cancel, verify_engine, RuleScanResult,
 };

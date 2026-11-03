@@ -13,7 +13,7 @@ TurkuazAV is a **read-only experimental file analysis tool**, **not an antivirus
 ## Capabilities
 
 - **Rust Core**: SHA-256 file/directory scan, 100 MiB default per-file ceiling, skip symlinks/reparse points, cancellation and explicit error reporting. CLI streams results through `scan_path_each` without retaining an unbounded result list; `scan_path` remains as a compatibility API for small in-memory consumers.
-- **Rust CLI**: `scan` and developer-only `scan-rules` commands.
+- **Rust CLI**: `scan`, developer-only `scan-rules`, and **explicit bounded polling** `observe` commands. `observe` inventories SHA-256 read-only, detects added/modified/removed regular files, and never starts automatically; this is neither OS event monitoring nor antivirus protection.
 - **YARA-X**: verifies RSA-PSS-SHA256 rule signature, snapshots rules and target, verifies pinned executable SHA-256 (Windows/Linux x64), bounded output and timeout.
 - **Trusted publisher API**: independent pinned keyring, strict four-field manifest, canonical payload, signed rule digest and persistent 40-byte anti-rollback state (same contract as .NET 0.2.4).
 - **Rust Desktop**: cross-platform egui GUI for read-only *file or folder SHA-256* scanning, file/folder picker, cancel, live progress counters, last-file digest report, clipboard copy, maximum 20 in-memory session entries and redacted local diagnostics with 7-day retention. This is not a malware verdict.
@@ -30,6 +30,14 @@ cargo test --lib --test rust_compat
 cargo run --bin turkuazav -- scan .
 cargo run --features desktop --bin turkuazav-desktop
 ```
+
+Optional foreground observer preview (a fixed number of cycles, no daemon or autostart):
+
+```bash
+cargo run --bin turkuazav -- observe ./my-directory 3 2
+```
+
+The observer hashes each eligible file on each cycle (up to 4,096 files, each under the 100 MiB scan limit). Skipped files, symlinks and reparse directories are **not covered**. If a previously tracked file becomes inaccessible or too large, the cycle fails closed without updating its baseline. No events are guaranteed between polls. Sensitive filenames are only printed to the local console; there is no persisted observation log.
 
 Developer-only signed rule scan, not an independent production trust root:
 
