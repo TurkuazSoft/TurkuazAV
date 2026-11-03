@@ -143,10 +143,13 @@ pub fn accept_version(state_file: &Path, sequence: i64, fingerprint: &[u8; 32]) 
     if sequence <= 0 {
         bail!("Invalid rule version");
     }
-    let parent = state_file.parent().filter(|p| p.is_dir()).context(
-        "Version state parent directory must already exist",
-    )?;
-    let filename = state_file.file_name().context("Invalid version state filename")?;
+    let parent = state_file
+        .parent()
+        .filter(|p| p.is_dir())
+        .context("Version state parent directory must already exist")?;
+    let filename = state_file
+        .file_name()
+        .context("Invalid version state filename")?;
     let mut lock_name = filename.to_os_string();
     lock_name.push(".lock");
     let lock_path = parent.join(lock_name);
@@ -406,9 +409,15 @@ mod tests {
         accept_version(&state, 11, &[1; 32]).unwrap();
         std::fs::write(tmp.path().join(".turkuazav-version-abandoned"), [9u8; 3]).unwrap();
         assert!(accept_version(&state, 10, &[1; 32]).is_err());
-        assert_eq!(i64::from_le_bytes(std::fs::read(&state).unwrap()[..8].try_into().unwrap()), 11);
+        assert_eq!(
+            i64::from_le_bytes(std::fs::read(&state).unwrap()[..8].try_into().unwrap()),
+            11
+        );
         accept_version(&state, 12, &[2; 32]).unwrap();
-        assert_eq!(i64::from_le_bytes(std::fs::read(&state).unwrap()[..8].try_into().unwrap()), 12);
+        assert_eq!(
+            i64::from_le_bytes(std::fs::read(&state).unwrap()[..8].try_into().unwrap()),
+            12
+        );
     }
 
     #[test]
