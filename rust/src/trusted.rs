@@ -20,6 +20,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
     path::Path,
+    sync::atomic::{AtomicBool, Ordering},
 };
 use subtle::ConstantTimeEq;
 
@@ -186,6 +187,17 @@ pub fn accept_version(state_file: &Path, sequence: i64, fingerprint: &[u8; 32]) 
     result
 }
 
+/// Grouping paths keeps the cancellable API small without breaking
+/// the existing v0.3.1 non-cancellable library entry point.
+pub struct TrustedScanPaths<'a> {
+    pub target: &'a Path,
+    pub rules_path: &'a Path,
+    pub manifest: &'a Path,
+    pub signature: &'a Path,
+    pub engine: &'a Path,
+    pub state_file: &'a Path,
+}
+
 pub fn scan_trusted_rules(
     target: &Path,
     rules_path: &Path,
@@ -195,11 +207,41 @@ pub fn scan_trusted_rules(
     state_file: &Path,
     ring: &TrustedKeyring,
 ) -> Result<RuleScanResult> {
-    let verified = verify_package(rules_path, manifest, signature, ring)?;
-    let result = rules::scan_verified_rules(target, &verified.verified_rules, engine)?;
-    // Commit only after the engine completes and parser accepts output.
+    scan_trusted_rules_with_cancel(
+        TrustedScanPaths {
+            target,
+            rules_path,
+            manifest,
+            signature,
+            engine,
+            state_file,
+        },
+        ring,
+        &AtomicBool::new(false),
+    )
+}
+
+pub fn scan_trusted_rules_with_cancel(
+    paths: TrustedScanPaths<'_>,
+    ring: &TrustedKeyring,
+    cancelled: &AtomicBool,
+) -> Result<RuleScanResult> {
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("YARA-X scan cancelled");
+    }
+    let verified = verify_package(paths.rules_path, paths.manifest, paths.signature, ring)?;
+    let result = rules::scan_verified_rules_with_cancel(
+        paths.target,
+        &verified.verified_rules,
+        paths.engine,
+        cancelled,
+    )?;
+    // Incomplete or cancelled scans must never advance anti-rollback state.
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("YARA-X scan cancelled");
+    }
     accept_version(
-        state_file,
+        paths.state_file,
         verified.sequence,
         &verified.manifest_fingerprint,
     )?;
@@ -216,6 +258,29 @@ mod tests {
         signature::{RandomizedSigner, SignatureEncoding},
         RsaPrivateKey,
     };
+
+    #[test]
+    fn cancelled_trusted_scan_must_not_create_version_state() {
+        let temp = tempfile::tempdir().unwrap();
+        let invalid = temp.path().join("missing");
+        let state = temp.path().join("state");
+        let ring = TrustedKeyring::from_pinned_pem(Vec::<(String, String)>::new()).unwrap();
+        let cancelled = AtomicBool::new(true);
+        let result = scan_trusted_rules_with_cancel(
+            TrustedScanPaths {
+                target: &invalid,
+                rules_path: &invalid,
+                manifest: &invalid,
+                signature: &invalid,
+                engine: &invalid,
+                state_file: &state,
+            },
+            &ring,
+            &cancelled,
+        );
+        assert!(result.unwrap_err().to_string().contains("cancelled"));
+        assert!(!state.exists());
+    }
 
     #[test]
     fn canonical_and_strict_manifest() {

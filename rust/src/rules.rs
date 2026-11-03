@@ -26,7 +26,10 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::mpsc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -148,6 +151,18 @@ fn stage_engine(engine: &Path, private_dir: &Path) -> Result<PathBuf> {
 }
 
 pub fn run_engine(engine: &Path, rules: &Path, target: &Path) -> Result<Vec<String>> {
+    run_engine_with_cancel(engine, rules, target, &AtomicBool::new(false))
+}
+
+pub fn run_engine_with_cancel(
+    engine: &Path,
+    rules: &Path,
+    target: &Path,
+    cancelled: &AtomicBool,
+) -> Result<Vec<String>> {
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("YARA-X scan cancelled");
+    }
     let private_dir = tempfile::Builder::new()
         .prefix("TurkuazAV-Engine-")
         .tempdir()?;
@@ -176,6 +191,11 @@ pub fn run_engine(engine: &Path, rules: &Path, target: &Path) -> Result<Vec<Stri
     let started = Instant::now();
     let timeout = Duration::from_secs(config::ENGINE_TIMEOUT_SECONDS);
     let exit = loop {
+        if cancelled.load(Ordering::Relaxed) {
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!("YARA-X scan cancelled");
+        }
         match child.try_wait() {
             Ok(Some(status)) => break status,
             Ok(None) => (),
@@ -198,6 +218,9 @@ pub fn run_engine(engine: &Path, rules: &Path, target: &Path) -> Result<Vec<Stri
     let stderr = err_receiver
         .recv_timeout(timeout.saturating_sub(started.elapsed()))
         .context("YARA-X stderr read timed out")??;
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("YARA-X scan cancelled");
+    }
     if !exit.success() {
         let text = String::from_utf8_lossy(&stderr);
         bail!("YARA-X engine failed: {}", text);
@@ -209,12 +232,26 @@ pub fn run_engine(engine: &Path, rules: &Path, target: &Path) -> Result<Vec<Stri
 }
 
 pub fn snapshot(target: &Path, snapshot: &Path) -> Result<()> {
+    snapshot_with_cancel(target, snapshot, &AtomicBool::new(false))
+}
+
+pub fn snapshot_with_cancel(
+    target: &Path,
+    snapshot: &Path,
+    cancelled: &AtomicBool,
+) -> Result<()> {
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("YARA-X scan cancelled");
+    }
     ensure_regular(target, config::MAX_FILE_SIZE)?;
     let mut input = File::open(target).context("Target open failed")?;
     let mut output = File::create_new(snapshot).context("Snapshot creation failed")?;
     let mut copied = 0u64;
     let mut buffer = [0u8; 4096];
     loop {
+        if cancelled.load(Ordering::Relaxed) {
+            bail!("YARA-X scan cancelled");
+        }
         let count = input.read(&mut buffer)?;
         if count == 0 {
             break;
@@ -226,10 +263,25 @@ pub fn snapshot(target: &Path, snapshot: &Path) -> Result<()> {
         output.write_all(&buffer[..count])?;
     }
     output.flush()?;
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("YARA-X scan cancelled");
+    }
     Ok(())
 }
 
 pub fn scan_verified_rules(target: &Path, rules: &[u8], engine: &Path) -> Result<RuleScanResult> {
+    scan_verified_rules_with_cancel(target, rules, engine, &AtomicBool::new(false))
+}
+
+pub fn scan_verified_rules_with_cancel(
+    target: &Path,
+    rules: &[u8],
+    engine: &Path,
+    cancelled: &AtomicBool,
+) -> Result<RuleScanResult> {
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("YARA-X scan cancelled");
+    }
     ensure_regular(target, config::MAX_FILE_SIZE)?;
     let temp = tempfile::Builder::new()
         .prefix("TurkuazAV-Rules-")
@@ -237,8 +289,8 @@ pub fn scan_verified_rules(target: &Path, rules: &[u8], engine: &Path) -> Result
     let rule_path = temp.path().join("verified.yar");
     let snapshot_path = temp.path().join("target.snapshot");
     fs::write(&rule_path, rules)?;
-    snapshot(target, &snapshot_path)?;
-    let matches = run_engine(engine, &rule_path, &snapshot_path)?;
+    snapshot_with_cancel(target, &snapshot_path, cancelled)?;
+    let matches = run_engine_with_cancel(engine, &rule_path, &snapshot_path, cancelled)?;
     Ok(RuleScanResult {
         file_path: target.to_path_buf(),
         rule_identifiers: matches,
@@ -253,13 +305,32 @@ pub fn scan_rules(
     public_key: &Path,
     engine: &Path,
 ) -> Result<RuleScanResult> {
+    scan_rules_with_cancel(
+        target, rules, signature, public_key, engine, &AtomicBool::new(false),
+    )
+}
+
+pub fn scan_rules_with_cancel(
+    target: &Path,
+    rules: &Path,
+    signature: &Path,
+    public_key: &Path,
+    engine: &Path,
+    cancelled: &AtomicBool,
+) -> Result<RuleScanResult> {
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("YARA-X scan cancelled");
+    }
     ensure_regular(target, config::MAX_FILE_SIZE)?;
     let rules_bytes = read_bounded(rules, config::MAX_RULE_BYTES)?;
     let signature_bytes = read_bounded(signature, config::MAX_SIGNATURE_BYTES)?;
     let public_bytes = read_bounded(public_key, config::MAX_PUBLIC_KEY_BYTES)?;
     let pem = std::str::from_utf8(&public_bytes).context("Invalid PEM encoding")?;
     verify_signature(&rules_bytes, &signature_bytes, pem)?;
-    scan_verified_rules(target, &rules_bytes, engine)
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("YARA-X scan cancelled");
+    }
+    scan_verified_rules_with_cancel(target, &rules_bytes, engine, cancelled)
 }
 
 #[cfg(test)]
@@ -288,6 +359,25 @@ mod tests {
             &f
         )
         .is_err());
+    }
+    #[test]
+    fn cancellation_fails_before_untrusted_rule_io() {
+        let cancelled = AtomicBool::new(true);
+        let invalid = Path::new("this-path-must-not-be-opened");
+        let result = scan_rules_with_cancel(
+            invalid, invalid, invalid, invalid, invalid, &cancelled,
+        );
+        assert!(result.unwrap_err().to_string().contains("cancelled"));
+    }
+    #[test]
+    fn snapshot_cancellation_never_leaves_complete_success() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source");
+        let dest = temp.path().join("snapshot");
+        fs::write(&source, b"example").unwrap();
+        let cancelled = AtomicBool::new(true);
+        assert!(snapshot_with_cancel(&source, &dest, &cancelled).is_err());
+        assert!(!dest.exists());
     }
     #[test]
     fn staged_engine_fails_closed_for_untrusted_bytes() {

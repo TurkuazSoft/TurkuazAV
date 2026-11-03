@@ -16,7 +16,7 @@ Bagimli Oldugu Katman: Documentation
 | --- | --- | --- |
 | SHA-256 sınırlı tarama | `rust/src/scan.rs` | Rust birim, klasör/skip/iptal ve bağlantı testleri |
 | CLI `scan` | `rust/src/bin/cli.rs` | Gerçek binary stdout, hash ve exit-code smoke |
-| CLI `scan-rules` | `rust/src/rules.rs` | RSA-PSS, pinned YARA-X, snapshot, pozitif/negatif E2E |
+| CLI `scan-rules` | `rust/src/rules.rs` | RSA-PSS, pinned YARA-X, snapshot, iptal ve pozitif/negatif E2E |
 | Trusted manifest | `rust/src/trusted.rs` | Strict schema, imza ve hash regresyonları |
 | 40-byte anti-rollback state | `rust/src/trusted.rs` | Sıra/çakışma/eski state + gerçek YARA-X E2E |
 | WinUI tek dosya arayüzü | `rust/src/bin/desktop.rs` | Rust GUI derleme ve worker-disconnect testleri |
