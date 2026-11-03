@@ -65,16 +65,11 @@ impl NativeChangeWakeup {
 mod platform {
     use super::*;
     use anyhow::Context;
-    use std::{
-        ffi::c_void,
-        os::windows::ffi::OsStrExt,
-        ptr,
-        time::Instant,
-    };
+    use std::{ffi::c_void, os::windows::ffi::OsStrExt, ptr, time::Instant};
 
     type Handle = *mut c_void;
-    const WATCH_CHANGES: u32 = 0x0000_0001 | 0x0000_0002 | 0x0000_0004 | 0x0000_0008
-        | 0x0000_0010 | 0x0000_0040;
+    const WATCH_CHANGES: u32 =
+        0x0000_0001 | 0x0000_0002 | 0x0000_0004 | 0x0000_0008 | 0x0000_0010 | 0x0000_0040;
     const WAIT_OBJECT_0: u32 = 0;
     const WAIT_TIMEOUT: u32 = 0x0000_0102;
 
@@ -174,10 +169,20 @@ mod platform {
 
     const IN_NONBLOCK: c_int = 0x800;
     const IN_CLOEXEC: c_int = 0x80000;
-    const IN_EVENTS: u32 = 0x0000_0001 | 0x0000_0002 | 0x0000_0004 | 0x0000_0008
-        | 0x0000_0010 | 0x0000_0020 | 0x0000_0040 | 0x0000_0080
-        | 0x0000_0100 | 0x0000_0200 | 0x0000_0400 | 0x0000_0800
-        | 0x0100_0000 | 0x0200_0000;
+    const IN_EVENTS: u32 = 0x0000_0001
+        | 0x0000_0002
+        | 0x0000_0004
+        | 0x0000_0008
+        | 0x0000_0010
+        | 0x0000_0020
+        | 0x0000_0040
+        | 0x0000_0080
+        | 0x0000_0100
+        | 0x0000_0200
+        | 0x0000_0400
+        | 0x0000_0800
+        | 0x0100_0000
+        | 0x0200_0000;
     const IN_Q_OVERFLOW: u32 = 0x0000_4000;
     const IN_IGNORED: u32 = 0x0000_8000;
     const IN_SELF_LOST: u32 = 0x0000_0400 | 0x0000_0800 | 0x0000_2000;
@@ -226,12 +231,11 @@ mod platform {
                             if count - offset < 16 {
                                 bail!("Truncated Linux change notification");
                             }
-                            let mask = u32::from_ne_bytes(
-                                buffer[offset + 4..offset + 8].try_into()?,
-                            );
-                            let length = u32::from_ne_bytes(
-                                buffer[offset + 12..offset + 16].try_into()?,
-                            ) as usize;
+                            let mask =
+                                u32::from_ne_bytes(buffer[offset + 4..offset + 8].try_into()?);
+                            let length =
+                                u32::from_ne_bytes(buffer[offset + 12..offset + 16].try_into()?)
+                                    as usize;
                             let end = offset
                                 .checked_add(16)
                                 .and_then(|p| p.checked_add(length))
