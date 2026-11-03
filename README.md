@@ -37,6 +37,14 @@ Optional foreground observer preview (a fixed number of cycles, no daemon or aut
 cargo run --bin turkuazav -- observe ./my-directory 3 2
 ```
 
+Native change notification preview (also foreground and bounded):
+
+```bash
+cargo run --bin turkuazav -- observe-events ./my-directory 3 2
+```
+
+`observe-events` waits for a native change **hint** or an interval deadline, then runs the same complete, read-only SHA-256 inventory. Windows uses recursive change notifications; Linux currently listens to its root directory, so **nested changes rely on the periodic full-tree fallback**. Watch loss and inotify queue overflow fail closed. A notification is never treated as malware evidence or a complete event history.
+
 The observer hashes each eligible file on each cycle (up to 4,096 files, each under the 100 MiB scan limit). Skipped files, symlinks and reparse directories are **not covered**. If a previously tracked file becomes inaccessible or too large, the cycle fails closed without updating its baseline. No events are guaranteed between polls. Sensitive filenames are only printed to the local console; there is no persisted observation log.
 
 Developer-only signed rule scan, not an independent production trust root:

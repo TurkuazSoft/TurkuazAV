@@ -7,10 +7,12 @@
 
 use anyhow::Context;
 use std::{env, path::Path, process::ExitCode, sync::atomic::AtomicBool, thread, time::Duration};
-use turkuazav::{scan_path_each, scan_rules, ChangeKind, DirectoryObserver, ScanStatus};
+use turkuazav::{
+    scan_path_each, scan_rules, ChangeKind, DirectoryObserver, NativeChangeWakeup, ScanStatus,
+};
 
 fn usage() {
-    println!("Usage: turkuazav scan <file-or-directory> OR turkuazav scan-rules <target> <rules.yar> <rules.sig> <public.pem> <absolute-yr-path> OR turkuazav observe <directory> <cycles:1..20> <interval-seconds:1..60>");
+    println!("Usage: turkuazav scan <file-or-directory> OR turkuazav scan-rules <target> <rules.yar> <rules.sig> <public.pem> <absolute-yr-path> OR turkuazav observe <directory> <cycles:1..20> <interval-seconds:1..60> OR turkuazav observe-events <directory> <cycles:1..20> <max-interval-seconds:1..60>");
 }
 
 fn run(args: &[String]) -> anyhow::Result<u8> {
@@ -46,7 +48,7 @@ fn run(args: &[String]) -> anyhow::Result<u8> {
             );
             Ok(if failed > 0 { 1 } else { 0 })
         }
-        [verb, root, cycles, interval] if verb == "observe" => {
+        [verb, root, cycles, interval] if verb == "observe" || verb == "observe-events" => {
             let cycles: u32 = cycles.parse().context("Invalid observe cycle count")?;
             let interval: u64 = interval.parse().context("Invalid observe interval")?;
             anyhow::ensure!(
@@ -55,10 +57,19 @@ fn run(args: &[String]) -> anyhow::Result<u8> {
             );
             let cancel = AtomicBool::new(false);
             let mut observer = DirectoryObserver::new(Path::new(root), &cancel)?;
+            let mut wakeup = if verb == "observe-events" {
+                Some(NativeChangeWakeup::new(observer.root())?)
+            } else {
+                None
+            };
             println!("BASELINE | {} tracked files", observer.tracked_files());
             let mut total = 0usize;
             for _ in 0..cycles {
-                thread::sleep(Duration::from_secs(interval));
+                if let Some(watcher) = &mut wakeup {
+                    let _ = watcher.wait(&cancel, Duration::from_secs(interval))?;
+                } else {
+                    thread::sleep(Duration::from_secs(interval));
+                }
                 let changes = observer.poll(&cancel)?;
                 for change in &changes {
                     let label = match change.kind {

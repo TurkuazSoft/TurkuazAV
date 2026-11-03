@@ -85,6 +85,10 @@ impl DirectoryObserver {
         self.baseline.len()
     }
 
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     /// Failed, cancelled, oversized or inaccessible polls do NOT mutate the
     /// accepted baseline. A lost previously tracked file that still exists
     /// cannot be misreported as a legitimate deletion.

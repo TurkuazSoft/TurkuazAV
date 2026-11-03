@@ -10,7 +10,8 @@ Bagimli Oldugu Katman: Documentation
 
 - `rust/src/config.rs`: fixed limits and platform-specific YARA-X executable SHA-256 pins
 - `rust/src/scan.rs`: read-only file enumeration, bounded streaming SHA-256, symlink/reparse handling and cancellation
-- `rust/src/monitor.rs`: bounded read-only directory polling based on complete SHA-256 snapshots; in-memory delta state, no daemon or filesystem event API
+- `rust/src/monitor.rs`: bounded read-only SHA-256 directory polling and in-memory delta state
+- `rust/src/native_events.rs`: opt-in Windows recursive change notification / Linux inotify root notification hint adapter; periodic full-tree polling fallback remains authoritative, no daemon or blocking hook
 - `rust/src/rules.rs`: RSA-PSS-SHA256 verification, bounded snapshots, engine hash validation, subprocess timeout/output limit and NDJSON parsing
 - `rust/src/trusted.rs`: strict manifest parser, pinned publisher keyring, canonical signed payload and protected anti-rollback 40-byte format
 - `rust/src/bin/cli.rs`: console controller and textual report

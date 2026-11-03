@@ -7,11 +7,13 @@
 
 pub mod config;
 pub mod monitor;
+pub mod native_events;
 pub mod rules;
 pub mod scan;
 pub mod trusted;
 
 pub use monitor::{ChangeKind, DirectoryObserver, ObservedChange};
+pub use native_events::{NativeChangeWakeup, WakeReason};
 pub use rules::{
     parse_yarax_output, scan_rules, scan_rules_with_cancel, verify_engine, RuleScanResult,
 };
