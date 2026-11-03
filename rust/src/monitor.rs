@@ -153,21 +153,22 @@ mod tests {
         let changed = observer.poll(&cancelled).unwrap();
         assert_eq!(changed.len(), 1);
         assert_eq!(changed[0].kind, ChangeKind::Modified);
-        assert_eq!(changed[0].path, first);
+        assert_eq!(changed[0].path, fs::canonicalize(&first).unwrap());
         assert!(changed[0].sha256.is_some());
 
         let second = temp.path().join("ikinci.txt");
         fs::write(&second, b"second").unwrap();
+        let second_canonical = fs::canonicalize(&second).unwrap();
         let added = observer.poll(&cancelled).unwrap();
         assert_eq!(added.len(), 1);
         assert_eq!(added[0].kind, ChangeKind::Added);
-        assert_eq!(added[0].path, second);
+        assert_eq!(added[0].path, second_canonical);
 
         fs::remove_file(&second).unwrap();
         let removed = observer.poll(&cancelled).unwrap();
         assert_eq!(removed.len(), 1);
         assert_eq!(removed[0].kind, ChangeKind::Removed);
-        assert_eq!(removed[0].path, second);
+        assert_eq!(removed[0].path, second_canonical);
         assert!(removed[0].sha256.is_none());
         assert!(observer.poll(&cancelled).unwrap().is_empty());
     }
