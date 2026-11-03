@@ -65,7 +65,7 @@ impl NativeChangeWakeup {
 mod platform {
     use super::*;
     use anyhow::Context;
-    use std::{ffi::c_void, os::windows::ffi::OsStrExt, ptr, time::Instant};
+    use std::{ffi::c_void, os::windows::ffi::OsStrExt, time::Instant};
 
     type Handle = *mut c_void;
     const WATCH_CHANGES: u32 =
@@ -98,7 +98,7 @@ mod platform {
                 .collect();
             // SAFETY: path is NUL-terminated and lives throughout this call.
             let handle = unsafe { first_change(path.as_ptr(), 1, WATCH_CHANGES) };
-            if handle == (-1isize as Handle) || handle == ptr::null_mut() {
+            if handle == (-1isize as Handle) || handle.is_null() {
                 return Err(std::io::Error::last_os_error())
                     .context("Cannot register Windows change notification");
             }
@@ -116,7 +116,7 @@ mod platform {
                     return Ok(WakeReason::Interval);
                 }
                 // Short waits make cancellation responsive; no busy loop.
-                let timeout = remaining.as_millis().min(100).max(1) as u32;
+                let timeout = remaining.as_millis().clamp(1, 100) as u32;
                 // SAFETY: the notification handle remains owned by Watcher.
                 let outcome = unsafe { wait_object(self.handle, timeout) };
                 match outcome {
