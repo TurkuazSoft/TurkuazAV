@@ -118,3 +118,27 @@ fn observer_cli_rejects_unbounded_cycles_and_missing_directory() {
         .unwrap();
     assert!(!missing.status.success());
 }
+
+#[cfg(any(windows, target_os = "linux"))]
+#[test]
+fn native_observer_cli_smoke_from_unicode_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("Olay İzleme");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("sample.txt"), b"abc").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_turkuazav"))
+        .arg("observe-events")
+        .arg(&root)
+        .args(["1", "1"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("BASELINE | 1 tracked files"));
+    assert!(stdout.contains("Observe: changes=0, cycles=1"));
+}

@@ -283,6 +283,18 @@ mod tests {
         assert_eq!(result.unwrap(), WakeReason::ChangeHint);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn native_watcher_denies_symlink_root() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("real");
+        let link = dir.path().join("linked");
+        std::fs::create_dir(&real).unwrap();
+        symlink(&real, &link).unwrap();
+        assert!(NativeChangeWakeup::new(&link).is_err());
+    }
+
     #[cfg(any(windows, target_os = "linux"))]
     #[test]
     fn cancelled_native_wait_fails_without_writing() {
