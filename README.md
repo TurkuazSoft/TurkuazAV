@@ -45,7 +45,14 @@ pwsh ./tools/install-yarax.ps1
 cargo test --test yarax_e2e
 ```
 
-CI: `.github/workflows/rust-ci.yml` on Windows 2022 and Ubuntu 24.04, including native GUI build and unsigned test artifact. CI build **does not** prove interactive GUI startup; manual OS smoke is separately required.
+CI: `.github/workflows/rust-ci.yml` on Windows 2022 and Ubuntu 24.04 includes locked builds, Rust CLI subprocess checks, desktop worker lifecycle tests, real pinned YARA-X tests, Clippy and package verification. On each OS the unsigned local test bundle contains `turkuazav` (CLI), `turkuazav-desktop` (GUI), `README.md`, `SECURITY.md` and `SHA256SUMS`.
+
+- Windows: `TurkuazAV-0.3.1-RUST-UNSIGNED-LOCAL-TEST-win-x64.zip`
+- Linux: `TurkuazAV-0.3.1-RUST-UNSIGNED-LOCAL-TEST-linux-x64.tar.gz`
+- Each archive also has an archive-level `.sha256` sidecar. See `tools/package-rust-preview.ps1`.
+- Both packages are **unsigned CI test artifacts only**, not installers or published production releases. Linux GUI requires compatible system display/graphics dependencies.
+
+A successful CI build does **not** prove interactive GUI behavior on end-user machines; file picker, clipboard and cancellation still require real Windows/Linux manual smoke tests.
 
 ## Security / compatibility
 

@@ -12,6 +12,6 @@ The Rust desktop (`rust/src/bin/desktop.rs`) uses eframe/egui, a native file pic
 
 Features: select a single file, clear old hash when selection changes, SHA-256 scan with cancel control, report status/byte size/hash, copy hash, maximum 20 in-memory history entries, clear history and diagnostics with code/category only (no paths, digests or exception messages). Diagnostics are written under the OS-specific local data directory, retained for seven days.
 
-No real-time protection, deletion, quarantine, driver or malware verdict is provided. Windows/Linux native GUI compilation in CI is not a substitute for real interactive smoke testing. Unsigned Windows CI artifact is for isolated local testing, not a production installer.
+No real-time protection, deletion, quarantine, driver or malware verdict is provided. Windows/Linux native GUI compilation in CI is not a substitute for real interactive smoke testing. Unsigned Windows and Linux CI archives include the Rust GUI and CLI together, plus SHA256SUMS and archive checksum. They are for isolated local testing, not production installers.
 
 Manual acceptance still required for file picker, cancellation, clipboard, history reset, resize, Unicode paths, Linux desktop launch, Windows desktop launch and unexpected failures.

@@ -3,43 +3,56 @@ Dosya Yolu: REPO_ROOT/docs/rust-migration.md
 Amac: TurkuazAV 0.3.1 Rust donusum ve kanit plani
 Modul - FileType: Documentation - Markdown
 Version: 0.3.1
-Aciklama: Gercek testlerle eski uygulamanin Rust'a aktarimi
+Aciklama: Eski .NET 0.3.1 ile Rust esdegerlik ve release kapilari
 Bagimli Oldugu Katman: Documentation
 -->
-# TurkuazAV 0.3.1 - Rust Donusumu
+# TurkuazAV 0.3.1 - Rust Dönüşümü
 
-Bu dal native Rust Core, CLI ve desktop icin gecis calismasidir. Main dalindaki .NET 0.3.1, esdegerlik kanitlanana kadar referans olarak kalir. Test artifactlari production release degildir.
+`feat/rust-native-v0.3.1` dalında v0.3.1 kaynakları Rust ile yeniden yazıldı ve eski C# / WinUI kaynakları **bu dalda** kaldırıldı. `main` dalındaki .NET 0.3.1 referansı ve Git geçmişi korunmaktadır. PR #10 taslaktır; imzasız test artifact'ı production release değildir.
 
-## Esdegerlik matrisi
+## Eşdeğerlik ve kanıt matrisi
 
-| Eski bilesen | Rust karsiligi | Kanit |
+| Eski bileşen | Rust karşılığı | Kanıt |
 | --- | --- | --- |
-| SHA-256 bounded scan | rust/src/scan.rs | Rust unit, folder/skip/cancel |
-| CLI scan | rust/src/bin/cli.rs | Smoke/CLI |
-| CLI scan-rules | rust/src/rules.rs | RSA-PSS, pinned YARA-X, snapshot |
-| Trusted manifest | rust/src/trusted.rs | Strict schema, signature, hash |
-| 40-byte state | rust/src/trusted.rs | Same-sequence, conflict, rollback |
-| WinUI single-file | rust/src/bin/desktop.rs | Rust GUI, manual E2E pending |
-| Copy, cancel, history | rust/src/bin/desktop.rs | GUI manual E2E pending |
-| Local diagnostics | rust/src/bin/desktop.rs | Privacy and retention E2E pending |
+| SHA-256 sınırlı tarama | `rust/src/scan.rs` | Rust birim, klasör/skip/iptal ve bağlantı testleri |
+| CLI `scan` | `rust/src/bin/cli.rs` | Gerçek binary stdout, hash ve exit-code smoke |
+| CLI `scan-rules` | `rust/src/rules.rs` | RSA-PSS, pinned YARA-X, snapshot, pozitif/negatif E2E |
+| Trusted manifest | `rust/src/trusted.rs` | Strict schema, imza ve hash regresyonları |
+| 40-byte anti-rollback state | `rust/src/trusted.rs` | Sıra/çakışma/eski state + gerçek YARA-X E2E |
+| WinUI tek dosya arayüzü | `rust/src/bin/desktop.rs` | Rust GUI derleme ve worker-disconnect testleri |
+| Kopyala, iptal, geçmiş | `rust/src/bin/desktop.rs` | Kaynak+derleme testi; gerçek UI smoke bekliyor |
+| Yerel tanı kayıtları | `rust/src/bin/desktop.rs` | Kod/kategori ile kayıt; yerel gizlilik smoke bekliyor |
 
-## Guvenlik sinirlari
+## Windows ve Linux doğrulama
 
-* SHA-256 sonucu malware verdict degildir. Gercek zamanli koruma, karantina, silme, driver yoktur.
-* GUI yalnizca hash hesaplar; untrusted CLI anahtar dosyasiyla otomatik publisher guveni vermez.
-* Core'da trusted keyring yalnizca bagimsiz ve guvenilir bootstrap tarafindan verilir.
-* Gelistirici scan-rules CLI'sindeki key parametresi production trust root degildir.
-* Rust dis YARA-X executable dogrulamasi eski pinli Windows/Linux x64 SHA-256 ile ayni seviyededir.
-* File permission/symlink/TOCTOU ve engine process-tree izolasyonu icin ilave sertlestirme gerekir.
-* State dosyasi sadece servis hesabinin yazabildigi korunan dizinde tutulmalidir.
-* Platforma ozel Windows/Linux/macOS GUI ve normal kullanici acceptance testleri tamamlanmadan esdegerlik iddiasi kurulamaz.
+```bash
+cargo fmt --all -- --check
+cargo check --locked --bins
+cargo test --locked --lib --test rust_compat --test cli_smoke
+cargo clippy --locked --lib --bin turkuazav --tests -- -D warnings
+cargo check --locked --features desktop --bin turkuazav-desktop
+cargo clippy --locked --features desktop --bin turkuazav-desktop -- -D warnings
+cargo test --locked --features desktop --bin turkuazav-desktop
+cargo build --locked --release --features desktop --bins
+```
 
-## Gecis kararlari
+Gerçek YARA-X E2E için doğrulanmış motoru yükleyin ve `TURKUAZ_YR_PATH` tanımlayın; ardından:
 
-1. Rust unit+contract+YARA-X integration, her iki OS'de CI gecmeli.
-2. Windows masaustu UI secim, iptal, hash kopyalama, oturum gecmisi ve diagnostics manual smoke ile kanitlanmali.
-3. Orijinal .NET testlerini silmeden once Rust testleri ayni guvenlik davranislarini dogrulamali.
-4. Ancak kanitlardan sonra eski CSharp, XAML, csproj, Dotnet CI ve packaging kontrollu diff ile kaldirilir.
-5. Release / main merge yalnizca ayri explicit talimatla yapilir.
+```bash
+cargo test --locked --test yarax_e2e
+```
 
-Gelistirme: cargo test --lib --test rust_compat; cargo build --release --bin turkuazav; cargo run --features desktop --bin turkuazav-desktop.
+CI `tools/package-rust-preview.ps1` ile test ZIP/TAR.GZ paketini açıp **her kritik dosyayı sayar ve SHA-256 kontrolü** yapar. Ayrı `.sha256` dosyası arşivin tamamını korumak için sağlanır. Ne checksum ne de imzasız paket, kod imzası veya AV sınıflandırması yerine geçer.
+
+## Manuel test kapıları
+
+Windows ve Linux gerçek oturumlarında dosya seçici, uzun taramanın iptali, pencere yeniden boyutlandırma, UTF-8 dosya yolu, kopyala, yeni seçimde eski hash'in temizlenmesi, 20 kayıt limiti, geçmiş temizleme, hata sonrası yeniden deneme ve tanı kayıtlarının gizlilik/7 gün silme davranışı test edilmelidir. CI'da GUI derlemesi / GUI logic testleri, ekrandan testin yerine geçmez.
+
+## Üretim dışı sınırlar
+
+- SHA-256 veya YARA-X kural eşleşmesi antivirüsün temiz/zararlı kararı değildir.
+- Gerçek zamanlı koruma, karantina, silme ve kernel sürücüsü v0.3.1 kapsamına dahil değildir.
+- Publisher anahtar kökü henüz üretim için güvenli şekilde provision edilmedi; CLI'da verilen PEM güven kökü sayılamaz.
+- YARA-X executable hash/execute yarışına, ayrıcalıklı state rollback'e, dosya snapshot TOCTOU'ya, subprocess sandbox/child-tree temizliğine ve elektrik kesintisi durumlarına ek sertleştirme gerekir.
+- macOS engine pin ve macOS CI henüz yoktur; platform destek iddiası olmamalıdır.
+- Bu dal production sürüm değildir: `main` birleştirme, imzalama ve release ayrı onay gerektirir.
