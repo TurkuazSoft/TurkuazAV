@@ -13,6 +13,7 @@ use std::{
     thread,
     time::Duration,
 };
+use anyhow::Context;
 use turkuazav::{scan_path_each, scan_rules, ChangeKind, DirectoryObserver, ScanStatus};
 
 fn usage() {

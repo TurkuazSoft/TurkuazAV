@@ -6,7 +6,7 @@
 // Bagimli Oldugu Katman: Service | Repo | Config
 
 use crate::{
-    config::{MAX_MONITORED_FILES, MAX_FILE_SIZE},
+    config::MAX_MONITORED_FILES,
     scan::{is_reparse_or_symlink, scan_path_each, ScanStatus},
 };
 use anyhow::{bail, Context, Result};
@@ -134,6 +134,7 @@ impl DirectoryObserver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::MAX_FILE_SIZE;
 
     #[test]
     fn read_only_change_detection_and_no_initial_events() {
