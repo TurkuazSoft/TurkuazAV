@@ -2,7 +2,7 @@
 # Amac: GitHub-hosted Windows runner'inda gecici SCM servisini baslat/durdur
 # Modul - FileType: Tests - PowerShell
 # Version: 0.3.1
-# Aciklama: LocalService, demand-only, kontrollu cleanup; production installer degil
+# Aciklama: LocalService, demand-only, crash recovery ve kontrollu cleanup; installer degil
 # Bagimli Oldugu Katman: Tool | Service | Config
 
 $ErrorActionPreference = 'Stop'
@@ -67,6 +67,71 @@ try {
         Write-Host "RUST_SCM_CYCLE_$($cycle)=PASS"
     }
     Write-Host 'RUST_SCM_LIVE_START_STOP=PASS'
+
+    # CI-only SCM recovery contract. Only restart the ephemeral service:
+    # never configure reboot or arbitrary external commands as failure actions.
+    & sc.exe failure $serviceName 'reset=' '60' 'actions=' 'restart/1000/restart/1000/restart/1000' | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot configure isolated SCM restart policy.' }
+    $policy = (& sc.exe qfailure $serviceName | Out-String)
+    if ($LASTEXITCODE -ne 0 -or $policy -notmatch 'RESTART') {
+        throw 'SCM restart policy was not registered.'
+    }
+    Write-Host 'RUST_SCM_RECOVERY_POLICY=PASS'
+
+    $service = Get-Service -Name $serviceName
+    $service.Start()
+    $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Running, [TimeSpan]::FromSeconds(35))
+
+    # Verify both the configured service and the exact live process belong
+    # to the unique fixture BEFORE forcefully stopping that process.
+    $live = $null
+    for ($attempt = 0; $attempt -lt 50; $attempt++) {
+        $live = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+        if ($null -ne $live -and $live.State -eq 'Running' -and [uint32]$live.ProcessId -gt 0) { break }
+        Start-Sleep -Milliseconds 200
+    }
+    if ($null -eq $live -or $live.State -ne 'Running' -or [uint32]$live.ProcessId -eq 0) {
+        throw 'SCM service has no running process for recovery acceptance.'
+    }
+    if ($live.StartMode -ne 'Manual' -or $live.StartName -notmatch 'LocalService' -or
+        $live.PathName -notlike "*$binary*") {
+        throw 'SCM recovery fixture identity unexpectedly changed.'
+    }
+    $previousPid = [uint32]$live.ProcessId
+    $processRecord = Get-CimInstance Win32_Process -Filter "ProcessId=$previousPid"
+    if ($null -eq $processRecord -or [string]::IsNullOrWhiteSpace($processRecord.ExecutablePath) -or
+        $processRecord.ExecutablePath -ine $binary) {
+        throw 'Refusing to terminate a process outside the isolated service binary.'
+    }
+    Stop-Process -Id $previousPid -Force -ErrorAction Stop
+
+    # A process crash should trigger SCM recovery once, with a NEW PID.
+    $restarted = $false
+    for ($attempt = 0; $attempt -lt 140; $attempt++) {
+        Start-Sleep -Milliseconds 250
+        $newState = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+        if ($null -ne $newState -and $newState.State -eq 'Running' -and
+            [uint32]$newState.ProcessId -gt 0 -and [uint32]$newState.ProcessId -ne $previousPid) {
+            $newProcess = Get-CimInstance Win32_Process -Filter "ProcessId=$($newState.ProcessId)"
+            if ($null -ne $newProcess -and $newProcess.ExecutablePath -ieq $binary) {
+                $restarted = $true
+                break
+            }
+        }
+    }
+    if (-not $restarted) { throw 'SCM service did not recover with a new trusted process.' }
+    Write-Host 'RUST_SCM_CRASH_RECOVERY=PASS'
+
+    $service = Get-Service -Name $serviceName
+    $service.Stop()
+    $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Stopped, [TimeSpan]::FromSeconds(35))
+    Start-Sleep -Seconds 3
+    $finalState = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+    if ($null -eq $finalState -or $finalState.State -ne 'Stopped' -or
+        [uint32]$finalState.ProcessId -ne 0) {
+        throw 'Normal SCM STOP incorrectly triggered restart or retained a process.'
+    }
+    Write-Host 'RUST_SCM_STOP_NO_RESTART=PASS'
 } finally {
     if ($created) {
         try {
