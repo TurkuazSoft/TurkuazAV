@@ -44,12 +44,14 @@ fn inventory(
     max_files: usize,
 ) -> Result<BTreeMap<PathBuf, String>> {
     let mut files = BTreeMap::new();
+    let mut inspected = 0usize;
     scan_path_each(root, cancelled, |item| {
+        inspected += 1;
+        if inspected > max_files {
+            bail!("Observer file count limit exceeded");
+        }
         match item.status {
             ScanStatus::Hashed => {
-                if files.len() >= max_files {
-                    bail!("Observer file count limit exceeded");
-                }
                 let hash = item
                     .sha256
                     .context("Missing SHA-256 from successful scan")?;
@@ -207,6 +209,19 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         fs::write(temp.path().join("a"), b"1").unwrap();
         fs::write(temp.path().join("b"), b"2").unwrap();
+        assert!(inventory(temp.path(), &AtomicBool::new(false), 1).is_err());
+    }
+
+    #[test]
+    fn skipped_large_files_also_count_toward_observer_bound() {
+        let temp = tempfile::tempdir().unwrap();
+        for name in ["a", "b"] {
+            let file = temp.path().join(name);
+            fs::File::create(file)
+                .unwrap()
+                .set_len(MAX_FILE_SIZE + 1)
+                .unwrap();
+        }
         assert!(inventory(temp.path(), &AtomicBool::new(false), 1).is_err());
     }
 
