@@ -53,6 +53,16 @@ jobs:
         run: cargo clippy --locked --lib --bin turkuazav --bin turkuazav-service --tests -- -D warnings
       - name: Build release CLI
         run: cargo build --locked --release --bin turkuazav --bin turkuazav-service
+      # Never run privileged ephemeral service registration for untrusted fork PR code.
+      # Tests are scoped to the fresh hosted CI machine; no production installation.
+      - name: Live systemd unit lifecycle and crash recovery (trusted CI)
+        if: runner.os == 'Linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        shell: bash
+        run: bash ./tools/test-service-systemd-ci.sh
+      - name: Live Windows SCM LocalService start-stop (trusted CI)
+        if: runner.os == 'Windows' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        shell: pwsh
+        run: ./tools/test-service-scm-ci.ps1
 
   native-desktop:
     strategy:

@@ -92,7 +92,7 @@ For an unprivileged local test with no service registration:
 cargo run --bin turkuazav-service -- --once /absolute/watched/directory 2
 ```
 
-CI exercises `--once` from a relocated extracted test package on both OSes, and Linux subprocess SIGTERM shutdown, but does not install systemd/SCM or prove production service recovery. Exit on native watcher failure is nonzero so an externally configured supervisor may restart it. Cooperative shutdown may block if an OS file read hangs.
+CI exercises `--once` from a relocated extracted test package on both OSes and Linux subprocess SIGTERM shutdown. Trusted, ephemeral **GitHub-hosted** CI additionally tests a real Windows SCM service running under `LocalService` (manual start/stop) and an isolated Linux `systemd` unit rendered from the shipped template (start/stop and `Restart=on-failure` after a forced crash). These tests clean up their temporary registrations, do not enable autostart, and are excluded for fork PRs. They are **not** production service-account provisioning, customer-machine acceptance, or proof of protection. Exit on native watcher failure is nonzero so an externally configured supervisor may restart it. Cooperative shutdown may block if an OS file read hangs.
 
 ## Security / compatibility
 

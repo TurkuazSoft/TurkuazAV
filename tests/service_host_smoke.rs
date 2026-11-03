@@ -97,3 +97,17 @@ fn linux_sigterm_gracefully_stops_foreground_service_process() {
         std::thread::sleep(Duration::from_millis(25));
     }
 }
+
+#[cfg(windows)]
+#[test]
+fn scm_dispatch_rejects_start_without_service_control_manager() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_turkuazav-service"))
+        .arg("--scm")
+        .arg(dir.path())
+        .arg("1")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Service Control Manager"));
+}
