@@ -133,27 +133,35 @@ pub fn scan_file(path: &Path, cancelled: &AtomicBool) -> FileScanResult {
     }
 }
 
-pub fn scan_path(path: &Path, cancelled: &AtomicBool) -> Result<Vec<FileScanResult>> {
+/// Streams scan results to a caller-owned consumer instead of collecting an
+/// entire directory into memory. This preserves the former .NET CLI's
+/// incremental results contract. Consumer failures and cancellation stop
+/// traversal immediately.
+pub fn scan_path_each(
+    path: &Path,
+    cancelled: &AtomicBool,
+    mut on_result: impl FnMut(FileScanResult) -> Result<()>,
+) -> Result<()> {
     let meta = fs::symlink_metadata(path).context("Scan root does not exist")?;
     if is_reparse_or_symlink(&meta) {
         bail!("Root symbolic link denied");
     }
+    if cancelled.load(Ordering::Relaxed) {
+        bail!("Scan cancelled");
+    }
     if meta.is_file() {
-        return Ok(vec![scan_file(path, cancelled)]);
+        return on_result(scan_file(path, cancelled));
     }
     if !meta.is_dir() {
         bail!("Invalid scan root");
     }
-    let mut results = Vec::new();
     for item in WalkDir::new(path)
         .follow_links(false)
-        .sort_by_file_name()
         .into_iter()
         .filter_entry(|entry| {
             entry.depth() == 0
                 || fs::symlink_metadata(entry.path())
-                    .map(|meta| !is_reparse_or_symlink(&meta))
-                    .unwrap_or(true)
+                    .is_ok_and(|meta| !is_reparse_or_symlink(&meta))
         })
     {
         if cancelled.load(Ordering::Relaxed) {
@@ -161,19 +169,27 @@ pub fn scan_path(path: &Path, cancelled: &AtomicBool) -> Result<Vec<FileScanResu
         }
         match item {
             Ok(entry) if entry.file_type().is_dir() => (),
-            Ok(entry) => {
-                // Reparse-directory descent is prohibited by filter_entry.
-                results.push(scan_file(entry.path(), cancelled));
-            }
-            Err(error) => results.push(FileScanResult {
+            Ok(entry) => on_result(scan_file(entry.path(), cancelled))?,
+            Err(error) => on_result(FileScanResult {
                 path: error.path().unwrap_or(path).to_path_buf(),
                 status: ScanStatus::Failed,
                 sha256: None,
                 size_bytes: None,
                 details: Some(error.to_string()),
-            }),
+            })?,
         }
     }
+    Ok(())
+}
+
+/// Compatibility API for existing consumers that require all results in RAM.
+/// CLI and future background workers should prefer scan_path_each.
+pub fn scan_path(path: &Path, cancelled: &AtomicBool) -> Result<Vec<FileScanResult>> {
+    let mut results = Vec::new();
+    scan_path_each(path, cancelled, |result| {
+        results.push(result);
+        Ok(())
+    })?;
     Ok(results)
 }
 
@@ -230,6 +246,38 @@ mod tests {
         assert_eq!(result.status, ScanStatus::Failed);
         assert!(result.sha256.is_none());
     }
+    #[test]
+    fn streaming_consumer_error_stops_the_walk_immediately() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("a"), b"first").unwrap();
+        fs::write(temp.path().join("b"), b"second").unwrap();
+        let mut seen = 0;
+        let error = scan_path_each(temp.path(), &AtomicBool::new(false), |_result| {
+            seen += 1;
+            Err(anyhow::anyhow!("consumer stopped"))
+        })
+        .unwrap_err();
+        assert_eq!(seen, 1);
+        assert!(error.to_string().contains("consumer stopped"));
+    }
+
+    #[test]
+    fn streaming_cancel_stops_before_next_entry() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("a"), b"first").unwrap();
+        fs::write(temp.path().join("b"), b"second").unwrap();
+        let cancelled = AtomicBool::new(false);
+        let mut seen = 0;
+        let error = scan_path_each(temp.path(), &cancelled, |_result| {
+            seen += 1;
+            cancelled.store(true, Ordering::Relaxed);
+            Ok(())
+        })
+        .unwrap_err();
+        assert_eq!(seen, 1);
+        assert!(error.to_string().contains("cancelled"));
+    }
+
     #[cfg(unix)]
     #[test]
     fn directory_symlink_does_not_escape_scan_root() {

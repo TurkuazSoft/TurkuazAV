@@ -6,7 +6,7 @@
 // Bagimli Oldugu Katman: Controller | Service | View
 
 use std::{env, path::Path, process::ExitCode, sync::atomic::AtomicBool};
-use turkuazav::{scan_path, scan_rules, ScanStatus};
+use turkuazav::{scan_path_each, scan_rules, ScanStatus};
 
 fn usage() {
     println!("Usage: turkuazav scan <file-or-directory> OR turkuazav scan-rules <target> <rules.yar> <rules.sig> <public.pem> <absolute-yr-path>");
@@ -15,9 +15,8 @@ fn usage() {
 fn run(args: &[String]) -> anyhow::Result<u8> {
     match args {
         [verb, path] if verb == "scan" => {
-            let results = scan_path(Path::new(path), &AtomicBool::new(false))?;
             let (mut hashed, mut skipped, mut failed) = (0, 0, 0);
-            for r in results {
+            scan_path_each(Path::new(path), &AtomicBool::new(false), |r| {
                 let path = r.path.display();
                 match r.status {
                     ScanStatus::Hashed => {
@@ -38,7 +37,8 @@ fn run(args: &[String]) -> anyhow::Result<u8> {
                         println!("ERROR | {} | {}", path, r.details.unwrap_or_default());
                     }
                 }
-            }
+                Ok(())
+            })?;
             println!(
                 "Summary: hashed={}, skipped={}, failed={}",
                 hashed, skipped, failed

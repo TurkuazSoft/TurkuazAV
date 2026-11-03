@@ -46,3 +46,27 @@ fn usage_is_nonzero_and_invalid_input_fails_closed() {
     assert!(!error.status.success());
     assert!(String::from_utf8_lossy(&error.stderr).contains("Scan error:"));
 }
+
+#[test]
+fn unicode_directory_scan_from_unrelated_working_directory_streams_results() {
+    let temp = tempfile::tempdir().unwrap();
+    let input = temp.path().join("Deneme Türkçe klasör");
+    fs::create_dir_all(&input).unwrap();
+    fs::write(input.join("giriş.txt"), b"first").unwrap();
+    fs::write(input.join("ikinci.txt"), b"second").unwrap();
+    let big = fs::File::create(input.join("big.bin")).unwrap();
+    big.set_len(turkuazav::config::MAX_FILE_SIZE + 1).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_turkuazav"))
+        .arg("scan")
+        .arg(&input)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("giriş.txt"));
+    assert!(stdout.contains("ikinci.txt"));
+    assert!(stdout.contains("SKIP |"));
+    assert!(stdout.contains("Summary: hashed=2, skipped=1, failed=0"));
+}

@@ -13,7 +13,7 @@ pub mod trusted;
 pub use rules::{
     parse_yarax_output, scan_rules, scan_rules_with_cancel, verify_engine, RuleScanResult,
 };
-pub use scan::{scan_file, scan_path, FileScanResult, ScanStatus};
+pub use scan::{scan_file, scan_path, scan_path_each, FileScanResult, ScanStatus};
 pub use trusted::{
     accept_version, scan_trusted_rules, scan_trusted_rules_with_cancel, verify_package,
     TrustedKeyring, TrustedScanPaths, VerifiedRulePackage,

@@ -14,7 +14,7 @@ Bagimli Oldugu Katman: Documentation
 
 | Eski bileşen | Rust karşılığı | Kanıt |
 | --- | --- | --- |
-| SHA-256 sınırlı tarama | `rust/src/scan.rs` | Rust birim, klasör/skip/iptal ve bağlantı testleri |
+| SHA-256 sınırlı tarama | `rust/src/scan.rs` | Rust birim, akış tabanlı klasör taraması, skip/iptal ve bağlantı testleri |
 | CLI `scan` | `rust/src/bin/cli.rs` | Gerçek binary stdout, hash ve exit-code smoke |
 | CLI `scan-rules` | `rust/src/rules.rs` | RSA-PSS, pinned YARA-X, snapshot, iptal ve pozitif/negatif E2E |
 | Trusted manifest | `rust/src/trusted.rs` | Strict schema, imza ve hash regresyonları |
