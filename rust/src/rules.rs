@@ -432,13 +432,7 @@ mod tests {
         let (_sender, receiver) = mpsc::channel();
         let cancelled = AtomicBool::new(true);
         let start = Instant::now();
-        assert!(receive_pipe(
-            &receiver,
-            start,
-            Duration::from_secs(30),
-            &cancelled,
-        )
-        .is_err());
+        assert!(receive_pipe(&receiver, start, Duration::from_secs(30), &cancelled,).is_err());
     }
     #[test]
     fn engine_output_limit_fails_closed() {
