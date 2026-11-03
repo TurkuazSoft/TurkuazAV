@@ -150,6 +150,34 @@ fn stage_engine(engine: &Path, private_dir: &Path) -> Result<PathBuf> {
     Ok(staged)
 }
 
+/// Poll pipe readers in short intervals so cancellation is also honored
+/// after the immediate YARA-X process has exited. Detached readers must not
+/// be joined without a deadline when a descendant holds an inherited pipe.
+fn receive_pipe(
+    receiver: &mpsc::Receiver<Result<Vec<u8>>>,
+    started: Instant,
+    deadline: Duration,
+    cancelled: &AtomicBool,
+) -> Result<Vec<u8>> {
+    loop {
+        if cancelled.load(Ordering::Relaxed) {
+            bail!("YARA-X scan cancelled");
+        }
+        let remaining = deadline.saturating_sub(started.elapsed());
+        if remaining.is_zero() {
+            bail!("YARA-X output read timed out");
+        }
+        let interval = remaining.min(Duration::from_millis(25));
+        match receiver.recv_timeout(interval) {
+            Ok(result) => return result,
+            Err(mpsc::RecvTimeoutError::Timeout) => (),
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                bail!("YARA-X pipe reader disconnected");
+            }
+        }
+    }
+}
+
 pub fn run_engine(engine: &Path, rules: &Path, target: &Path) -> Result<Vec<String>> {
     run_engine_with_cancel(engine, rules, target, &AtomicBool::new(false))
 }
@@ -212,12 +240,8 @@ pub fn run_engine_with_cancel(
         }
         thread::sleep(Duration::from_millis(25));
     };
-    let stdout = out_receiver
-        .recv_timeout(timeout.saturating_sub(started.elapsed()))
-        .context("YARA-X stdout read timed out")??;
-    let stderr = err_receiver
-        .recv_timeout(timeout.saturating_sub(started.elapsed()))
-        .context("YARA-X stderr read timed out")??;
+    let stdout = receive_pipe(&out_receiver, started, timeout, cancelled)?;
+    let stderr = receive_pipe(&err_receiver, started, timeout, cancelled)?;
     if cancelled.load(Ordering::Relaxed) {
         bail!("YARA-X scan cancelled");
     }
@@ -402,6 +426,19 @@ mod tests {
             .set_len(config::MAX_ENGINE_BYTES + 1)
             .unwrap();
         assert!(stage_engine(&source, &folder).is_err());
+    }
+    #[test]
+    fn pipe_reader_cancellation_is_not_delayed_by_inherited_handles() {
+        let (_sender, receiver) = mpsc::channel();
+        let cancelled = AtomicBool::new(true);
+        let start = Instant::now();
+        assert!(receive_pipe(
+            &receiver,
+            start,
+            Duration::from_secs(30),
+            &cancelled,
+        )
+        .is_err());
     }
     #[test]
     fn engine_output_limit_fails_closed() {
