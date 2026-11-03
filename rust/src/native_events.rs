@@ -169,12 +169,11 @@ mod platform {
 
     const IN_NONBLOCK: c_int = 0x800;
     const IN_CLOEXEC: c_int = 0x80000;
-    const IN_EVENTS: u32 = 0x0000_0001
-        | 0x0000_0002
+    // Do NOT watch IN_ACCESS (0x1), IN_CLOSE_NOWRITE (0x10) or IN_OPEN
+    // (0x20). Inventory reads would otherwise trigger their own next scan.
+    const IN_EVENTS: u32 = 0x0000_0002
         | 0x0000_0004
         | 0x0000_0008
-        | 0x0000_0010
-        | 0x0000_0020
         | 0x0000_0040
         | 0x0000_0080
         | 0x0000_0100
@@ -293,6 +292,20 @@ mod tests {
         std::fs::create_dir(&real).unwrap();
         symlink(&real, &link).unwrap();
         assert!(NativeChangeWakeup::new(&link).is_err());
+    }
+
+    #[cfg(any(windows, target_os = "linux"))]
+    #[test]
+    fn native_observer_does_not_wake_for_read_only_access() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("unchanged");
+        std::fs::write(&file, b"unchanged contents").unwrap();
+        let mut watcher = NativeChangeWakeup::new(dir.path()).unwrap();
+        assert_eq!(std::fs::read(&file).unwrap(), b"unchanged contents");
+        let result = watcher
+            .wait(&AtomicBool::new(false), Duration::from_millis(250))
+            .unwrap();
+        assert_eq!(result, WakeReason::Interval);
     }
 
     #[cfg(any(windows, target_os = "linux"))]
