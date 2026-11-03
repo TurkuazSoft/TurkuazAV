@@ -20,10 +20,10 @@ This v0.3.1 experimental implementation is not a full antivirus. It does not pro
 6. Only after successful real engine execution and validated NDJSON output, commit the anti-rollback state.
 7. Persistent state has exactly 40 bytes: 8-byte little-endian positive sequence + 32-byte SHA-256 canonical-payload fingerprint. Older sequences and same-sequence/different-payload are denied. Invalid/legacy 8-byte records fail closed.
 
-The storage location must be protected by host permissions; file locking does not defeat privileged tampering or rollback. No automatic legacy state migration occurs.
+The storage location must be protected by host permissions. Cooperative writers lock a stable sibling `.lock` file, stage the 40-byte record in the same directory, fsync the staging file and atomically replace the state (plus directory sync on Unix). An existing 0-byte state is now corruption, while a missing state can bootstrap a new installation. Atomic updates reduce partial-write exposure but cannot defeat privileged state deletion/rollback, filesystem compromise or power-loss guarantees on every Windows filesystem. No automatic legacy state migration occurs.
 
 ## Incomplete production controls
 
-Publisher trust-root provisioning, secure signed key rotation, protected service installation, process sandboxing and full process-tree termination, remaining local privilege/temporary-directory tamper hardening, target filesystem TOCTOU hardening, atomic state update/power-loss tests, fuzz and performance coverage, real interactive GUI smoke, production signing, quarantine and real-time blocking.
+Publisher trust-root provisioning, secure signed key rotation, protected service installation, process sandboxing and full process-tree termination, remaining local privilege/temporary-directory tamper hardening, target filesystem TOCTOU hardening, additional filesystem fault-injection and crash/power-loss testing, fuzz and performance coverage, real interactive GUI smoke, production signing, quarantine and real-time blocking.
 
 Do not run unsigned preview artifacts as the device's only endpoint protection.

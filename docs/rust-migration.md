@@ -18,7 +18,7 @@ Bagimli Oldugu Katman: Documentation
 | CLI `scan` | `rust/src/bin/cli.rs` | Gerçek binary stdout, hash ve exit-code smoke |
 | CLI `scan-rules` | `rust/src/rules.rs` | RSA-PSS, pinned YARA-X, snapshot, iptal ve pozitif/negatif E2E |
 | Trusted manifest | `rust/src/trusted.rs` | Strict schema, imza ve hash regresyonları |
-| 40-byte anti-rollback state | `rust/src/trusted.rs` | Sıra/çakışma/eski state + gerçek YARA-X E2E |
+| 40-byte anti-rollback state | `rust/src/trusted.rs` | Sıra/çakışma/eski state + eszamanli yazar ve atomik staging testleri + gercek YARA-X E2E |
 | WinUI tek dosya arayüzü | `rust/src/bin/desktop.rs` | Rust GUI dosya/klasör taraması, ilerleme sayaçları, worker-disconnect ve klasör mantık testleri |
 | Kopyala, iptal, geçmiş | `rust/src/bin/desktop.rs` | Kaynak+derleme testi; gerçek UI smoke bekliyor |
 | Yerel tanı kayıtları | `rust/src/bin/desktop.rs` | Kod/kategori ile kayıt; yerel gizlilik smoke bekliyor |
@@ -53,6 +53,6 @@ Windows ve Linux gerçek oturumlarında dosya seçici, uzun taramanın iptali, p
 - SHA-256 veya YARA-X kural eşleşmesi antivirüsün temiz/zararlı kararı değildir.
 - Gerçek zamanlı koruma, karantina, silme ve kernel sürücüsü v0.3.1 kapsamına dahil değildir.
 - Publisher anahtar kökü henüz üretim için güvenli şekilde provision edilmedi; CLI'da verilen PEM güven kökü sayılamaz.
-- Özel geçici alana alınmış YARA-X kopyası için dosya bütünlüğü doğrulanır; ancak yönetici ayrıcalığına sahip saldırganlara karşı süreç ve dosya izolasyonu tamamlanmadı. Ayrıcalıklı state rollback'e, dosya snapshot TOCTOU'ya, subprocess sandbox/child-tree temizliğine ve elektrik kesintisi durumlarına ek sertleştirme gerekir.
+- Özel geçici alana alınmış YARA-X kopyası için dosya bütünlüğü doğrulanır; ancak yönetici ayrıcalığına sahip saldırganlara karşı süreç ve dosya izolasyonu tamamlanmadı. Korumali dizinde 40-byte surum state'i atomik yenilenir; ayricalikli state rollback'e, dosya snapshot TOCTOU'ya, subprocess sandbox/child-tree temizligine ve elektrik kesintisi durumlarina ek sertlestirme gerekir.
 - macOS engine pin ve macOS CI henüz yoktur; platform destek iddiası olmamalıdır.
 - Bu dal production sürüm değildir: `main` birleştirme, imzalama ve release ayrı onay gerektirir.

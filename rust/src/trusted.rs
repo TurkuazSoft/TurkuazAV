@@ -18,7 +18,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
-    io::{Read, Seek, SeekFrom, Write},
+    io::Write,
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -133,34 +133,62 @@ pub fn verify_package(
     })
 }
 
-/// File must be in a pre-provisioned, access-controlled local service directory.
-/// A file lock prevents cooperating writers; not a defense against privileged rollback.
+/// File must live in an access-controlled local service directory.
+/// A separate stable .lock file serializes cooperating writers even when the
+/// 40-byte state inode is atomically replaced. It is NOT a privileged-rollback
+/// or hardware-root-of-trust defense.
 pub fn accept_version(state_file: &Path, sequence: i64, fingerprint: &[u8; 32]) -> Result<()> {
     if sequence <= 0 {
         bail!("Invalid rule version");
     }
-    // An existing symlink is never a valid state path.
-    if let Ok(meta) = std::fs::symlink_metadata(state_file) {
-        if crate::scan::is_reparse_or_symlink(&meta) {
-            bail!("Version state link denied");
+    let parent = state_file.parent().filter(|p| p.is_dir()).context(
+        "Version state parent directory must already exist",
+    )?;
+    let filename = state_file.file_name().context("Invalid version state filename")?;
+    let mut lock_name = filename.to_os_string();
+    lock_name.push(".lock");
+    let lock_path = parent.join(lock_name);
+
+    // A symlink/reparse lock could redirect the writer out of the protected root.
+    match std::fs::symlink_metadata(&lock_path) {
+        Ok(meta) if crate::scan::is_reparse_or_symlink(&meta) || !meta.is_file() => {
+            bail!("Invalid version lock path");
         }
+        Ok(_) => (),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        Err(error) => return Err(error).context("Cannot inspect version lock"),
     }
-    let mut file: File = OpenOptions::new()
+    let lock_file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
-        .open(state_file)
-        .context("Cannot open protected version state")?;
-    file.lock_exclusive().context("Cannot lock version state")?;
+        .open(&lock_path)
+        .context("Cannot open protected version lock")?;
+    lock_file
+        .lock_exclusive()
+        .context("Cannot lock protected version state")?;
     let result = (|| -> Result<()> {
-        let length = file.metadata()?.len();
-        if length != 0 && length != 40 {
-            bail!("Corrupt or legacy rule version state");
-        }
-        if length == 40 {
-            let mut saved = [0u8; 40];
-            file.read_exact(&mut saved)?;
+        let old = match std::fs::symlink_metadata(state_file) {
+            Ok(meta) => {
+                if crate::scan::is_reparse_or_symlink(&meta) || !meta.is_file() {
+                    bail!("Version state link or invalid file denied");
+                }
+                // An existing empty state is corruption, not a first install.
+                if meta.len() != 40 {
+                    bail!("Corrupt or legacy rule version state");
+                }
+                let bytes = std::fs::read(state_file).context("Cannot read version state")?;
+                if bytes.len() != 40 {
+                    bail!("Corrupt or legacy rule version state");
+                }
+                Some(bytes)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error).context("Cannot inspect version state"),
+        };
+
+        if let Some(saved) = old {
             let previous = i64::from_le_bytes(saved[..8].try_into()?);
             if previous <= 0 {
                 bail!("Corrupt rule version state");
@@ -175,15 +203,29 @@ pub fn accept_version(state_file: &Path, sequence: i64, fingerprint: &[u8; 32]) 
                 return Ok(());
             }
         }
+
         let mut next = [0u8; 40];
         next[..8].copy_from_slice(&sequence.to_le_bytes());
         next[8..].copy_from_slice(fingerprint);
-        file.seek(SeekFrom::Start(0))?;
-        file.write_all(&next)?;
-        file.sync_all()?;
+
+        // Staging within the SAME directory keeps rename on one filesystem.
+        // An interrupted staging write leaves the last committed state intact.
+        let mut staged = tempfile::Builder::new()
+            .prefix(".turkuazav-version-")
+            .tempfile_in(parent)
+            .context("Cannot stage version state")?;
+        staged.as_file_mut().write_all(&next)?;
+        staged.as_file_mut().sync_all()?;
+        staged
+            .persist(state_file)
+            .context("Cannot atomically replace version state")?;
+        #[cfg(unix)]
+        File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .context("Cannot sync version state directory")?;
         Ok(())
     })();
-    let _ = FileExt::unlock(&file);
+    let _ = FileExt::unlock(&lock_file);
     result
 }
 
@@ -307,6 +349,64 @@ mod tests {
         let legacy = tmp.path().join("old");
         std::fs::write(&legacy, [0u8; 8]).unwrap();
         assert!(accept_version(&legacy, 2, &a).is_err());
+    }
+
+    #[test]
+    fn empty_existing_state_is_corruption_not_first_boot() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = tmp.path().join("state");
+        std::fs::write(&state, []).unwrap();
+        assert!(accept_version(&state, 1, &[1; 32]).is_err());
+        assert!(std::fs::read(&state).unwrap().is_empty());
+    }
+
+    #[test]
+    fn concurrent_writers_keep_exact_40_byte_contract() {
+        let temp = tempfile::tempdir().unwrap();
+        let state = temp.path().join("version");
+        let threads: Vec<_> = (0..12)
+            .map(|_| {
+                let path = state.clone();
+                std::thread::spawn(move || accept_version(&path, 9, &[4u8; 32]))
+            })
+            .collect();
+        for worker in threads {
+            worker.join().unwrap().unwrap();
+        }
+        let saved = std::fs::read(&state).unwrap();
+        assert_eq!(saved.len(), 40);
+        assert_eq!(i64::from_le_bytes(saved[..8].try_into().unwrap()), 9);
+        assert_eq!(&saved[8..], &[4u8; 32]);
+        assert!(state.with_file_name("version.lock").is_file());
+        assert!(accept_version(&state, 8, &[4u8; 32]).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn version_state_and_lock_symlinks_are_rejected() {
+        use std::os::unix::fs::symlink;
+        let tmp = tempfile::tempdir().unwrap();
+        let outside = tmp.path().join("outside");
+        std::fs::write(&outside, [0xAA; 40]).unwrap();
+        let state = tmp.path().join("state");
+        symlink(&outside, &state).unwrap();
+        assert!(accept_version(&state, 1, &[1; 32]).is_err());
+        std::fs::remove_file(&state).unwrap();
+        symlink(&outside, tmp.path().join("state.lock")).unwrap();
+        assert!(accept_version(&state, 1, &[1; 32]).is_err());
+        assert_eq!(std::fs::read(outside).unwrap(), [0xAA; 40]);
+    }
+
+    #[test]
+    fn stray_incomplete_staging_file_cannot_replace_valid_state() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = tmp.path().join("state");
+        accept_version(&state, 11, &[1; 32]).unwrap();
+        std::fs::write(tmp.path().join(".turkuazav-version-abandoned"), [9u8; 3]).unwrap();
+        assert!(accept_version(&state, 10, &[1; 32]).is_err());
+        assert_eq!(i64::from_le_bytes(std::fs::read(&state).unwrap()[..8].try_into().unwrap()), 11);
+        accept_version(&state, 12, &[2; 32]).unwrap();
+        assert_eq!(i64::from_le_bytes(std::fs::read(&state).unwrap()[..8].try_into().unwrap()), 12);
     }
 
     #[test]
