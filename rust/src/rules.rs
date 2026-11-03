@@ -26,6 +26,7 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::mpsc,
     thread,
     time::{Duration, Instant},
 };
@@ -162,34 +163,42 @@ pub fn run_engine(engine: &Path, rules: &Path, target: &Path) -> Result<Vec<Stri
         .context("Unable to start YARA-X")?;
     let stdout = child.stdout.take().context("stdout unavailable")?;
     let stderr = child.stderr.take().context("stderr unavailable")?;
-    let out_reader = thread::spawn(move || read_pipe(stdout));
-    let err_reader = thread::spawn(move || read_pipe(stderr));
+    // Reader threads communicate through bounded messages. Never join a pipe
+    // reader indefinitely: an orphaned grandchild can retain an inherited pipe.
+    let (out_sender, out_receiver) = mpsc::channel();
+    let (err_sender, err_receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = out_sender.send(read_pipe(stdout));
+    });
+    thread::spawn(move || {
+        let _ = err_sender.send(read_pipe(stderr));
+    });
     let started = Instant::now();
-    let mut exit = None;
-    loop {
-        if let Some(status) = child.try_wait()? {
-            exit = Some(status);
-            break;
+    let timeout = Duration::from_secs(config::ENGINE_TIMEOUT_SECONDS);
+    let exit = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => (),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error).context("YARA-X process wait failed");
+            }
         }
-        if started.elapsed() >= Duration::from_secs(config::ENGINE_TIMEOUT_SECONDS) {
-            break;
+        if started.elapsed() >= timeout {
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!("YARA-X scan timed out");
         }
         thread::sleep(Duration::from_millis(25));
-    }
-    if exit.is_none() {
-        let _ = child.kill();
-        let _ = child.wait();
-    }
-    let stdout = out_reader
-        .join()
-        .map_err(|_| anyhow::anyhow!("YARA-X stdout thread panicked"))??;
-    let stderr = err_reader
-        .join()
-        .map_err(|_| anyhow::anyhow!("YARA-X stderr thread panicked"))??;
-    if exit.is_none() {
-        bail!("YARA-X scan timed out");
-    }
-    if !exit.expect("Checked above").success() {
+    };
+    let stdout = out_receiver
+        .recv_timeout(timeout.saturating_sub(started.elapsed()))
+        .context("YARA-X stdout read timed out")??;
+    let stderr = err_receiver
+        .recv_timeout(timeout.saturating_sub(started.elapsed()))
+        .context("YARA-X stderr read timed out")??;
+    if !exit.success() {
         let text = String::from_utf8_lossy(&stderr);
         bail!("YARA-X engine failed: {}", text);
     }
@@ -303,6 +312,11 @@ mod tests {
             .set_len(config::MAX_ENGINE_BYTES + 1)
             .unwrap();
         assert!(stage_engine(&source, &folder).is_err());
+    }
+    #[test]
+    fn engine_output_limit_fails_closed() {
+        let oversized = vec![b'A'; config::MAX_OUTPUT_BYTES + 1];
+        assert!(read_pipe(std::io::Cursor::new(oversized)).is_err());
     }
     #[test]
     fn wrong_engine_rejected() {
