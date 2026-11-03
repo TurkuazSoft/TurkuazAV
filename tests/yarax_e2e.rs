@@ -15,10 +15,14 @@ use rsa::{
 use sha2::{Digest, Sha256};
 use std::{
     fs,
+    sync::atomic::AtomicBool,
     path::{Path, PathBuf},
 };
 use turkuazav::trusted::{parse_manifest, signature_payload};
-use turkuazav::{scan_rules, scan_trusted_rules, TrustedKeyring};
+use turkuazav::{
+    scan_rules, scan_rules_with_cancel, scan_trusted_rules, scan_trusted_rules_with_cancel,
+    TrustedKeyring, TrustedScanPaths,
+};
 
 const RULE: &str =
     r#"rule TurkuazAvTest { strings: $marker = "TURKUAZ-AV-TEST-MARKER" condition: $marker }"#;
@@ -126,6 +130,31 @@ fn real_yarax_signed_and_trusted_regressions() {
         .unwrap()
         .rule_identifiers
         .is_empty());
+    assert_eq!(
+        i64::from_le_bytes(fs::read(&state).unwrap()[..8].try_into().unwrap()),
+        2
+    );
+
+    // Cancelling an otherwise valid new sequence must not advance trusted state.
+    write_package(temp.path(), &private, 3, RULE);
+    let cancelled = AtomicBool::new(true);
+    assert!(scan_trusted_rules_with_cancel(
+        TrustedScanPaths {
+            target: &positive,
+            rules_path: &rules,
+            manifest: &manifest,
+            signature: &signature,
+            engine: &engine,
+            state_file: &state,
+        },
+        &ring,
+        &cancelled,
+    )
+    .is_err());
+    assert!(scan_rules_with_cancel(
+        &positive, &rules, &signature, &pem_file, &engine, &cancelled,
+    )
+    .is_err());
     assert_eq!(
         i64::from_le_bytes(fs::read(&state).unwrap()[..8].try_into().unwrap()),
         2

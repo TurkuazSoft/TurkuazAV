@@ -10,8 +10,9 @@ pub mod rules;
 pub mod scan;
 pub mod trusted;
 
-pub use rules::{parse_yarax_output, scan_rules, verify_engine, RuleScanResult};
+pub use rules::{parse_yarax_output, scan_rules, scan_rules_with_cancel, verify_engine, RuleScanResult};
 pub use scan::{scan_file, scan_path, FileScanResult, ScanStatus};
 pub use trusted::{
-    accept_version, scan_trusted_rules, verify_package, TrustedKeyring, VerifiedRulePackage,
+    accept_version, scan_trusted_rules, scan_trusted_rules_with_cancel, verify_package,
+    TrustedKeyring, TrustedScanPaths, VerifiedRulePackage,
 };
