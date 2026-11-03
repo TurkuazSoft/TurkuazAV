@@ -63,7 +63,11 @@ fn unicode_directory_scan_from_unrelated_working_directory_streams_results() {
         .current_dir(temp.path())
         .output()
         .unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("giriş.txt"));
     assert!(stdout.contains("ikinci.txt"));
