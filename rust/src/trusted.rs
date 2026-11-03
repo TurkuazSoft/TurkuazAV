@@ -397,6 +397,8 @@ mod tests {
         symlink(&outside, &state).unwrap();
         assert!(accept_version(&state, 1, &[1; 32]).is_err());
         std::fs::remove_file(&state).unwrap();
+        // The first denied state attempt may legitimately create the sidecar.
+        std::fs::remove_file(tmp.path().join("state.lock")).unwrap();
         symlink(&outside, tmp.path().join("state.lock")).unwrap();
         assert!(accept_version(&state, 1, &[1; 32]).is_err());
         assert_eq!(std::fs::read(outside).unwrap(), [0xAA; 40]);
