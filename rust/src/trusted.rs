@@ -15,6 +15,8 @@ use fs2::FileExt;
 use rsa::{pkcs8::DecodePublicKey, traits::PublicKeyParts, RsaPublicKey};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
+use std::fs::File;
 use std::{
     collections::HashMap,
     fs::OpenOptions,
@@ -23,8 +25,6 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 use subtle::ConstantTimeEq;
-#[cfg(unix)]
-use std::fs::File;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
