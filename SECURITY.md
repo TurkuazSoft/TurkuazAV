@@ -8,7 +8,7 @@ Bagimli Oldugu Katman: Documentation
 -->
 # Security Policy
 
-TurkuazAV 0.3.1 Rust preview is **not** an antivirus, EDR, ransomware blocker or replacement for operating system protection. No realtime scanning, quarantine or malware verdict is implemented.
+TurkuazAV 0.3.1 Rust preview is **not** an antivirus, EDR, ransomware blocker or replacement for operating system protection. No realtime blocking, quarantine or malware verdict is implemented. The optional `observe` CLI is a **user-started, bounded SHA-256 polling preview**, not a real-time filesystem event source, AV service or protection mechanism. It neither blocks nor modifies files, may miss changes between polls, skips symlinks/reparse points and files over the scan size limit, and stops on partial/inaccessible scans. It only prints selected paths to the local console; no observer history is persisted.
 
 Do not disclose exploit details in public issues or PRs. Prefer GitHub private vulnerability reporting when available. Do not commit malware samples, secrets, private keys or customer data; use harmless test fixtures.
 
