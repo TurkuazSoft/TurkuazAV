@@ -10,9 +10,14 @@ on:
   push:
     branches:
       - main
-      - feat/rust-native-v0.3.1
   pull_request:
   workflow_dispatch:
+
+# Feature branch PRs already receive pull_request CI. Avoid a duplicate push
+# workflow and cancel superseded commits to conserve hosted runner minutes.
+concurrency:
+  group: rust-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
