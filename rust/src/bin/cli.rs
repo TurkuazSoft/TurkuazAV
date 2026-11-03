@@ -8,8 +8,8 @@
 use anyhow::Context;
 use std::{env, path::Path, process::ExitCode, sync::atomic::AtomicBool, thread, time::Duration};
 use turkuazav::{
-    scan_path_each, scan_rules, ChangeKind, DirectoryObserver, NativeChangeWakeup,
-    ScanCoordinator, ScanStatus,
+    scan_path_each, scan_rules, ChangeKind, DirectoryObserver, NativeChangeWakeup, ScanCoordinator,
+    ScanStatus,
 };
 
 fn usage() {

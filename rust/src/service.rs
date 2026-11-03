@@ -71,10 +71,7 @@ impl ScanCoordinator {
     /// @reason Failures and cancellation must not silently discard scan work.
     /// @contract Any signal arriving during a scan remains pending for another
     /// reconciliation; an unsuccessful scan re-queues its own work.
-    pub fn run_pending(
-        &mut self,
-        cancelled: &AtomicBool,
-    ) -> Result<Option<Vec<ObservedChange>>> {
+    pub fn run_pending(&mut self, cancelled: &AtomicBool) -> Result<Option<Vec<ObservedChange>>> {
         if cancelled.load(Ordering::Relaxed) {
             bail!("Scan coordination cancelled");
         }
@@ -110,7 +107,11 @@ mod tests {
             assert!(!signal.request());
         }
         assert!(signal.is_pending());
-        assert!(coordinator.run_pending(&cancel).unwrap().unwrap().is_empty());
+        assert!(coordinator
+            .run_pending(&cancel)
+            .unwrap()
+            .unwrap()
+            .is_empty());
         assert!(!signal.is_pending());
         assert!(coordinator.run_pending(&cancel).unwrap().is_none());
     }
@@ -125,7 +126,10 @@ mod tests {
             ScanCoordinator::new(DirectoryObserver::new(temp.path(), &cancel).unwrap());
         let signal = coordinator.signal();
 
-        fs::File::create(&file).unwrap().set_len(crate::config::MAX_FILE_SIZE + 1).unwrap();
+        fs::File::create(&file)
+            .unwrap()
+            .set_len(crate::config::MAX_FILE_SIZE + 1)
+            .unwrap();
         assert!(signal.request());
         assert!(coordinator.run_pending(&cancel).is_err());
         assert!(signal.is_pending());
