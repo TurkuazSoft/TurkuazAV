@@ -17,12 +17,14 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
-    fs::{File, OpenOptions},
+    fs::OpenOptions,
     io::Write,
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
 use subtle::ConstantTimeEq;
+#[cfg(unix)]
+use std::fs::File;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -355,7 +357,7 @@ mod tests {
     fn empty_existing_state_is_corruption_not_first_boot() {
         let tmp = tempfile::tempdir().unwrap();
         let state = tmp.path().join("state");
-        std::fs::write(&state, []).unwrap();
+        std::fs::write(&state, [0u8; 0]).unwrap();
         assert!(accept_version(&state, 1, &[1; 32]).is_err());
         assert!(std::fs::read(&state).unwrap().is_empty());
     }
