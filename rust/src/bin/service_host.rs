@@ -9,6 +9,7 @@ use anyhow::{bail, ensure, Context, Result};
 use std::{
     env,
     ffi::{OsStr, OsString},
+    io::Write,
     path::{Component, Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
@@ -361,6 +362,7 @@ fn run(args: &[OsString]) -> Result<()> {
 
             host_foreground(&settings, || {
                 println!("SERVICE_HOST=READY version={}", env!("CARGO_PKG_VERSION"));
+                std::io::stdout().flush().context("Cannot flush service readiness")?;
                 Ok(())
             })
         }
