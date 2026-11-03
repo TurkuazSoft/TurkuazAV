@@ -8,7 +8,7 @@
 use anyhow::{bail, ensure, Context, Result};
 use std::{
     env,
-    ffi::{OsStr, OsString},
+    ffi::OsString,
     io::Write,
     path::{Component, Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
