@@ -21,8 +21,8 @@ pub use rules::{
 };
 pub use scan::{scan_file, scan_path, scan_path_each, FileScanResult, ScanStatus};
 pub use service::{ReconcileSignal, ScanCoordinator};
-pub use worker::{SupervisedScanWorker, WorkerFault, WorkerHealth, WorkerPhase};
 pub use trusted::{
     accept_version, scan_trusted_rules, scan_trusted_rules_with_cancel, verify_package,
     TrustedKeyring, TrustedScanPaths, VerifiedRulePackage,
 };
+pub use worker::{SupervisedScanWorker, WorkerFault, WorkerHealth, WorkerPhase};

@@ -122,7 +122,10 @@ impl SupervisedScanWorker {
 
     pub fn health(&self) -> WorkerHealth {
         let mut snapshot = *self.shared.health.lock().unwrap();
-        if self.worker.as_ref().is_some_and(|handle| handle.is_finished())
+        if self
+            .worker
+            .as_ref()
+            .is_some_and(|handle| handle.is_finished())
             && snapshot.phase != WorkerPhase::Stopped
         {
             snapshot.phase = WorkerPhase::Panicked;
@@ -221,9 +224,8 @@ fn run_worker(
             match result {
                 Ok(Some(changes)) => {
                     health.successful_scans = health.successful_scans.saturating_add(1);
-                    health.observed_changes = health
-                        .observed_changes
-                        .saturating_add(changes.len() as u64);
+                    health.observed_changes =
+                        health.observed_changes.saturating_add(changes.len() as u64);
                     health.last_batch_changes = changes.len();
                     health.last_fault = None;
                     health.phase = WorkerPhase::Idle;
@@ -256,7 +258,7 @@ fn run_worker(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::MAX_FILE_SIZE, monitor::ChangeKind};
+    use crate::config::MAX_FILE_SIZE;
     use std::{fs, path::Path};
 
     fn start_worker(root: &Path) -> SupervisedScanWorker {
@@ -308,7 +310,6 @@ mod tests {
         assert!(restored.observed_changes >= 1);
         assert_eq!(restored.phase, WorkerPhase::Idle);
         assert_eq!(restored.last_fault, None);
-        assert_eq!(ChangeKind::Modified, ChangeKind::Modified);
         worker.stop().unwrap();
     }
 

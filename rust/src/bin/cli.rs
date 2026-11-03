@@ -110,10 +110,7 @@ fn run(args: &[String]) -> anyhow::Result<u8> {
             )?;
             for target in 1..=u64::from(cycles) {
                 worker.request();
-                let health = worker.wait_for_success(
-                    target,
-                    Duration::from_secs(interval + 10),
-                )?;
+                let health = worker.wait_for_success(target, Duration::from_secs(interval + 10))?;
                 println!(
                     "WORKER | scans={} | changes={} | failed={}",
                     health.successful_scans, health.observed_changes, health.failed_scans
