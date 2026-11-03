@@ -16,7 +16,7 @@ Bagimli Oldugu Katman: Documentation
 - `rust/src/worker.rs`: opt-in owned background thread with periodic reconciliation, bounded retry, path-free health counters, cooperative cancel/join
 - `rust/src/bin/service_host.rs`: separate read-only service process, Linux SIGTERM/foreground and Windows SCM STOP/SHUTDOWN entrypoints, opt-in only
 - `deploy/service/turkuazav-preview.service`: uninstalled Linux systemd hardening/restart-policy example, not an active service
-- `tools/test-service-scm-ci.ps1` / `tools/test-service-systemd-ci.sh`: CI-only privileged ephemeral SCM/systemd acceptance tests on trusted GitHub-hosted runners with cleanup
+- `tools/test-service-scm-ci.ps1` / `tools/test-service-systemd-ci.sh`: CI-only privileged ephemeral SCM/systemd acceptance tests on trusted GitHub-hosted runners with cleanup; Windows CI additionally validates restart-only SCM crash recovery and regular STOP not triggering recovery
 - `rust/src/rules.rs`: RSA-PSS-SHA256 verification, bounded snapshots, engine hash validation, subprocess timeout/output limit and NDJSON parsing
 - `rust/src/trusted.rs`: strict manifest parser, pinned publisher keyring, canonical signed payload and protected anti-rollback 40-byte format
 - `rust/src/bin/cli.rs`: console controller and textual report
