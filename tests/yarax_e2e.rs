@@ -15,8 +15,8 @@ use rsa::{
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    sync::atomic::AtomicBool,
     path::{Path, PathBuf},
+    sync::atomic::AtomicBool,
 };
 use turkuazav::trusted::{parse_manifest, signature_payload};
 use turkuazav::{
@@ -151,10 +151,10 @@ fn real_yarax_signed_and_trusted_regressions() {
         &cancelled,
     )
     .is_err());
-    assert!(scan_rules_with_cancel(
-        &positive, &rules, &signature, &pem_file, &engine, &cancelled,
-    )
-    .is_err());
+    assert!(
+        scan_rules_with_cancel(&positive, &rules, &signature, &pem_file, &engine, &cancelled,)
+            .is_err()
+    );
     assert_eq!(
         i64::from_le_bytes(fs::read(&state).unwrap()[..8].try_into().unwrap()),
         2

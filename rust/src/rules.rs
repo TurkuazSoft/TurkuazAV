@@ -235,11 +235,7 @@ pub fn snapshot(target: &Path, snapshot: &Path) -> Result<()> {
     snapshot_with_cancel(target, snapshot, &AtomicBool::new(false))
 }
 
-pub fn snapshot_with_cancel(
-    target: &Path,
-    snapshot: &Path,
-    cancelled: &AtomicBool,
-) -> Result<()> {
+pub fn snapshot_with_cancel(target: &Path, snapshot: &Path, cancelled: &AtomicBool) -> Result<()> {
     if cancelled.load(Ordering::Relaxed) {
         bail!("YARA-X scan cancelled");
     }
@@ -306,7 +302,12 @@ pub fn scan_rules(
     engine: &Path,
 ) -> Result<RuleScanResult> {
     scan_rules_with_cancel(
-        target, rules, signature, public_key, engine, &AtomicBool::new(false),
+        target,
+        rules,
+        signature,
+        public_key,
+        engine,
+        &AtomicBool::new(false),
     )
 }
 
@@ -364,9 +365,8 @@ mod tests {
     fn cancellation_fails_before_untrusted_rule_io() {
         let cancelled = AtomicBool::new(true);
         let invalid = Path::new("this-path-must-not-be-opened");
-        let result = scan_rules_with_cancel(
-            invalid, invalid, invalid, invalid, invalid, &cancelled,
-        );
+        let result =
+            scan_rules_with_cancel(invalid, invalid, invalid, invalid, invalid, &cancelled);
         assert!(result.unwrap_err().to_string().contains("cancelled"));
     }
     #[test]
