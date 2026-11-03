@@ -232,6 +232,23 @@ mod tests {
     }
     #[cfg(unix)]
     #[test]
+    fn directory_symlink_does_not_escape_scan_root() {
+        use std::os::unix::fs::symlink;
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("root");
+        let outside = temp.path().join("outside");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(root.join("safe.txt"), b"safe").unwrap();
+        fs::write(outside.join("private.txt"), b"outside").unwrap();
+        symlink(&outside, root.join("linked-folder")).unwrap();
+        let result = scan_path(&root, &AtomicBool::new(false)).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].path, root.join("safe.txt"));
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn symlink_not_followed() {
         use std::os::unix::fs::symlink;
         let temp = tempfile::tempdir().unwrap();

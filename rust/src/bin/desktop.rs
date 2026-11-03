@@ -78,8 +78,21 @@ impl DesktopApp {
     }
 
     fn poll(&mut self) {
-        let received = self.incoming.as_ref().and_then(|rx| rx.try_recv().ok());
-        if let Some(result) = received {
+        let received = self.incoming.as_ref().map(|rx| rx.try_recv());
+        if matches!(received, Some(Err(mpsc::TryRecvError::Disconnected))) {
+            // A panic or early exit in the worker must never leave GUI controls locked.
+            self.busy = false;
+            self.incoming = None;
+            self.report = None;
+            if self.cancel.load(Ordering::Relaxed) {
+                self.status = "Tarama iptal edildi.".into();
+            } else {
+                log_event("SCAN_FAILED", "WorkerDisconnected");
+                self.status = "Tarama tamamlanamadı. Yeniden deneyin.".into();
+            }
+            return;
+        }
+        if let Some(Ok(result)) = received {
             self.busy = false;
             self.incoming = None;
             if self.cancel.load(Ordering::Relaxed) {
@@ -266,4 +279,41 @@ fn main() -> eframe::Result<()> {
         eframe::NativeOptions::default(),
         Box::new(|_| Ok(Box::new(DesktopApp::default()))),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disconnected_worker_restores_controls_and_clears_report() {
+        let (sender, receiver) = mpsc::channel();
+        drop(sender);
+        let mut app = DesktopApp {
+            busy: true,
+            incoming: Some(receiver),
+            ..DesktopApp::default()
+        };
+        app.poll();
+        assert!(!app.busy);
+        assert!(app.incoming.is_none());
+        assert!(app.report.is_none());
+        assert!(app.status.contains("Yeniden deneyin"));
+    }
+
+    #[test]
+    fn disconnected_after_cancellation_is_not_reported_as_scan_success() {
+        let (sender, receiver) = mpsc::channel();
+        drop(sender);
+        let mut app = DesktopApp {
+            busy: true,
+            incoming: Some(receiver),
+            ..DesktopApp::default()
+        };
+        app.cancel.store(true, Ordering::Relaxed);
+        app.poll();
+        assert!(!app.busy);
+        assert!(app.report.is_none());
+        assert_eq!(app.status, "Tarama iptal edildi.");
+    }
 }
