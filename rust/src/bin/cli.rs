@@ -9,11 +9,11 @@ use anyhow::Context;
 use std::{env, path::Path, process::ExitCode, sync::atomic::AtomicBool, thread, time::Duration};
 use turkuazav::{
     scan_path_each, scan_rules, ChangeKind, DirectoryObserver, NativeChangeWakeup, ScanCoordinator,
-    ScanStatus,
+    ScanStatus, SupervisedScanWorker,
 };
 
 fn usage() {
-    println!("Usage: turkuazav scan <file-or-directory> OR turkuazav scan-rules <target> <rules.yar> <rules.sig> <public.pem> <absolute-yr-path> OR turkuazav observe <directory> <cycles:1..20> <interval-seconds:1..60> OR turkuazav observe-events <directory> <cycles:1..20> <max-interval-seconds:1..60>");
+    println!("Usage: turkuazav scan <file-or-directory> OR turkuazav scan-rules <target> <rules.yar> <rules.sig> <public.pem> <absolute-yr-path> OR turkuazav observe <directory> <cycles:1..20> <interval-seconds:1..60> OR turkuazav observe-events <directory> <cycles:1..20> <max-interval-seconds:1..60> OR turkuazav observe-worker <directory> <cycles:1..20> <interval-seconds:1..60>");
 }
 
 fn run(args: &[String]) -> anyhow::Result<u8> {
@@ -92,6 +92,38 @@ fn run(args: &[String]) -> anyhow::Result<u8> {
                 total += changes.len();
             }
             println!("Observe: changes={total}, cycles={cycles}");
+            Ok(0)
+        }
+        [verb, root, cycles, interval] if verb == "observe-worker" => {
+            let cycles: u32 = cycles.parse().context("Invalid worker cycle count")?;
+            let interval: u64 = interval.parse().context("Invalid worker interval")?;
+            anyhow::ensure!(
+                (1..=20).contains(&cycles) && (1..=60).contains(&interval),
+                "Worker cycles or interval outside safe bounds"
+            );
+            let cancelled = AtomicBool::new(false);
+            let observer = DirectoryObserver::new(Path::new(root), &cancelled)?;
+            let worker = SupervisedScanWorker::start(
+                observer,
+                Duration::from_secs(interval),
+                Duration::from_secs(interval),
+            )?;
+            for target in 1..=u64::from(cycles) {
+                worker.request();
+                let health = worker.wait_for_success(
+                    target,
+                    Duration::from_secs(interval + 10),
+                )?;
+                println!(
+                    "WORKER | scans={} | changes={} | failed={}",
+                    health.successful_scans, health.observed_changes, health.failed_scans
+                );
+            }
+            let health = worker.stop()?;
+            println!(
+                "Worker stopped: scans={}, failed={}",
+                health.successful_scans, health.failed_scans
+            );
             Ok(0)
         }
         [verb, target, rules, signature, key, engine] if verb == "scan-rules" => {

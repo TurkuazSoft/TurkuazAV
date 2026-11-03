@@ -142,3 +142,39 @@ fn native_observer_cli_smoke_from_unicode_directory() {
     assert!(stdout.contains("BASELINE | 1 tracked files"));
     assert!(stdout.contains("Observe: changes=0, cycles=1"));
 }
+
+#[test]
+fn explicit_worker_preview_terminates_and_reports_aggregates_only() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("İşçi Testi");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("data.txt"), b"abc").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_turkuazav"))
+        .arg("observe-worker")
+        .arg(&root)
+        .args(["2", "1"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.contains("WORKER | scans=1"));
+    assert!(text.contains("Worker stopped: scans="));
+    assert!(!text.contains("data.txt"));
+}
+
+#[test]
+fn explicit_worker_rejects_invalid_interval_without_starting() {
+    let temp = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_turkuazav"))
+        .arg("observe-worker")
+        .arg(temp.path())
+        .args(["1", "99"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+}

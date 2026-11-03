@@ -39,6 +39,14 @@ cargo run --bin turkuazav -- observe ./my-directory 3 2
 
 The service-core coordinator (`rust/src/service.rs`) coalesces repeated event hints into **one pending full-tree rescan**, without buffering raw paths. A failed or cancelled rescan remains pending for retry; requests arriving during a scan remain pending. This is a synchronous, read-only core designed for a future supervised worker, **not** an installed, privileged or protected OS service.
 
+Supervised worker preview (explicitly started; one thread, no installed service):
+
+```bash
+cargo run --bin turkuazav -- observe-worker ./my-directory 3 2
+```
+
+The worker owns the root-scoped coordinator and exposes limited health counters (completed/failed scans and change counts), without storing paths or digests. A single pending bit coalesces requests, periodic full-tree scans still run, and failed scans enter bounded retry backoff. The worker stops cooperatively and is joined; a hung filesystem operation is **not** guaranteed to stop within a fixed deadline. Neither systemd nor Windows Service integration is installed.
+
 Native change notification preview (also foreground and bounded):
 
 ```bash
