@@ -28,7 +28,10 @@ struct Settings {
 }
 
 fn parse_settings(args: &[OsString]) -> Result<(&str, Settings)> {
-    ensure!(args.len() == 3, "Expected <mode> <absolute-root> <interval-seconds>");
+    ensure!(
+        args.len() == 3,
+        "Expected <mode> <absolute-root> <interval-seconds>"
+    );
     let mode = args[0].to_str().context("Invalid service host mode")?;
     ensure!(
         matches!(mode, "--once" | "--foreground" | "--scm"),
@@ -37,7 +40,9 @@ fn parse_settings(args: &[OsString]) -> Result<(&str, Settings)> {
     let input = Path::new(&args[1]);
     ensure!(input.is_absolute(), "Service root must be absolute");
     ensure!(
-        !input.components().any(|item| matches!(item, Component::ParentDir)),
+        !input
+            .components()
+            .any(|item| matches!(item, Component::ParentDir)),
         "Parent traversal not allowed in service root"
     );
     let meta = std::fs::symlink_metadata(input).context("Service root unavailable")?;
@@ -79,8 +84,13 @@ fn host_foreground(settings: &Settings, on_ready: impl FnOnce() -> Result<()>) -
     let result = (|| -> Result<()> {
         let mut last_phase = WorkerPhase::Starting;
         while !STOP_REQUESTED.load(Ordering::Acquire) {
-            if watch.wait(&STOP_REQUESTED, WATCH_SLICE)? == WakeReason::ChangeHint {
-                worker.request();
+            match watch.wait(&STOP_REQUESTED, WATCH_SLICE) {
+                Ok(WakeReason::ChangeHint) => {
+                    worker.request();
+                }
+                Ok(WakeReason::Interval) => (),
+                Err(_) if STOP_REQUESTED.load(Ordering::Acquire) => break,
+                Err(error) => return Err(error),
             }
             let health = worker.health();
             if health.phase == WorkerPhase::Panicked || health.phase == WorkerPhase::Stopped {
@@ -88,9 +98,15 @@ fn host_foreground(settings: &Settings, on_ready: impl FnOnce() -> Result<()>) -
             }
             if health.phase != last_phase {
                 if health.phase == WorkerPhase::Degraded {
-                    eprintln!("SERVICE_HEALTH=DEGRADED failed_scans={}", health.failed_scans);
+                    eprintln!(
+                        "SERVICE_HEALTH=DEGRADED failed_scans={}",
+                        health.failed_scans
+                    );
                 } else if last_phase == WorkerPhase::Degraded {
-                    println!("SERVICE_HEALTH=RECOVERED successful_scans={}", health.successful_scans);
+                    println!(
+                        "SERVICE_HEALTH=RECOVERED successful_scans={}",
+                        health.successful_scans
+                    );
                 }
                 last_phase = health.phase;
             }
@@ -100,7 +116,10 @@ fn host_foreground(settings: &Settings, on_ready: impl FnOnce() -> Result<()>) -
     let stopped = worker.stop();
     result?;
     let health = stopped?;
-    ensure!(health.phase == WorkerPhase::Stopped, "Worker did not stop cleanly");
+    ensure!(
+        health.phase == WorkerPhase::Stopped,
+        "Worker did not stop cleanly"
+    );
     Ok(())
 }
 
@@ -112,7 +131,10 @@ fn run_once(settings: &Settings) -> Result<()> {
     let result = worker.wait_for_success(1, Duration::from_secs(15));
     let stopped = worker.stop()?;
     result?;
-    ensure!(stopped.phase == WorkerPhase::Stopped, "One-shot worker not stopped");
+    ensure!(
+        stopped.phase == WorkerPhase::Stopped,
+        "One-shot worker not stopped"
+    );
     println!("SERVICE_ONCE=PASS version={}", env!("CARGO_PKG_VERSION"));
     Ok(())
 }
@@ -256,12 +278,7 @@ mod scm {
         Ok(())
     }
 
-    unsafe extern "system" fn control(
-        code: u32,
-        _: u32,
-        _: *mut c_void,
-        _: *mut c_void,
-    ) -> u32 {
+    unsafe extern "system" fn control(code: u32, _: u32, _: *mut c_void, _: *mut c_void) -> u32 {
         match code {
             CONTROL_STOP | CONTROL_SHUTDOWN => {
                 STOP_REQUESTED.store(true, Ordering::Release);
@@ -277,11 +294,7 @@ mod scm {
         let service_name = wide_name();
         // SAFETY: service_name is NUL-terminated and the handler ABI matches Win32.
         let handle = unsafe {
-            RegisterServiceCtrlHandlerExW(
-                service_name.as_ptr(),
-                Some(control),
-                ptr::null_mut(),
-            )
+            RegisterServiceCtrlHandlerExW(service_name.as_ptr(), Some(control), ptr::null_mut())
         };
         ensure!(!handle.is_null(), "Cannot register Windows service handler");
         STATUS_HANDLE.store(handle, Ordering::Release);

@@ -47,10 +47,12 @@ jobs:
         run: cargo test --locked --test yarax_e2e
       - name: CLI process smoke tests
         run: cargo test --locked --test cli_smoke
+      - name: Service host subprocess and signal smoke
+        run: cargo test --locked --test service_host_smoke
       - name: Rust lint
-        run: cargo clippy --locked --lib --bin turkuazav --tests -- -D warnings
+        run: cargo clippy --locked --lib --bin turkuazav --bin turkuazav-service --tests -- -D warnings
       - name: Build release CLI
-        run: cargo build --locked --release --bin turkuazav
+        run: cargo build --locked --release --bin turkuazav --bin turkuazav-service
 
   native-desktop:
     strategy:

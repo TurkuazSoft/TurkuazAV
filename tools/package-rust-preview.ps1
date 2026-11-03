@@ -45,9 +45,14 @@ if (Test-Path -LiteralPath $archive) {
 }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
-$payload = @("turkuazav$extension", "turkuazav-desktop$extension", 'README.md', 'SECURITY.md')
+$payload = @("turkuazav$extension", "turkuazav-desktop$extension", "turkuazav-service$extension", 'README.md', 'SECURITY.md')
+if ($IsLinux) { $payload += @('turkuazav-preview.service', 'preview.env.example') }
 foreach ($filename in $payload) {
-    $source = if ($filename -like "*$extension" -and $filename -match '^turkuazav') {
+    $source = if ($filename -ceq 'turkuazav-preview.service') {
+        Join-Path $root 'deploy/service/turkuazav-preview.service'
+    } elseif ($filename -ceq 'preview.env.example') {
+        Join-Path $root 'deploy/service/preview.env.example'
+    } elseif ($filename -like "*$extension" -and $filename -match '^turkuazav') {
         Join-Path $root "target/release/$filename"
     } else {
         Join-Path $root $filename
@@ -118,6 +123,20 @@ try {
             Pop-Location
         }
         Write-Host 'RUST_NATIVE_PACKAGE_CLI_SMOKE=PASS'
+        # Run the shipped service host without SCM/systemd privileges.
+        # A successful one-shot scan is not an OS service installation test.
+        $serviceBinary = Join-Path $verify "turkuazav-service$extension"
+        Push-Location $smokeDir
+        try {
+            $serviceText = (& $serviceBinary --once $smokeDir 1 2>&1 | Out-String)
+            if ($LASTEXITCODE -ne 0) { throw 'Unpacked service host smoke failed.' }
+            if ($serviceText -notmatch "SERVICE_ONCE=PASS version=$([regex]::Escape($version))") {
+                throw 'Service host smoke contract failed.'
+            }
+        } finally {
+            Pop-Location
+        }
+        Write-Host 'RUST_NATIVE_PACKAGE_SERVICE_SMOKE=PASS'
     } finally {
         if (Test-Path -LiteralPath $smokeDir) {
             Remove-Item -LiteralPath $smokeDir -Recurse -Force

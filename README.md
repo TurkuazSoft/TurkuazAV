@@ -45,7 +45,7 @@ Supervised worker preview (explicitly started; one thread, no installed service)
 cargo run --bin turkuazav -- observe-worker ./my-directory 3 2
 ```
 
-The worker owns the root-scoped coordinator and exposes limited health counters (completed/failed scans and change counts), without storing paths or digests. A single pending bit coalesces requests, periodic full-tree scans still run, and failed scans enter bounded retry backoff. The worker stops cooperatively and is joined; a hung filesystem operation is **not** guaranteed to stop within a fixed deadline. Neither systemd nor Windows Service integration is installed.
+The worker owns the root-scoped coordinator and exposes limited health counters (completed/failed scans and change counts), without storing paths or digests. A single pending bit coalesces requests, periodic full-tree scans still run, and failed scans enter bounded retry backoff. The worker stops cooperatively and is joined; a hung filesystem operation is **not** guaranteed to stop within a fixed deadline. A separate `turkuazav-service` preview binary can now be supervised by Windows SCM or run in the foreground under Linux systemd. **No service is installed, enabled, privileged or hardened by the application.**
 
 Native change notification preview (also foreground and bounded):
 
@@ -71,7 +71,7 @@ pwsh ./tools/install-yarax.ps1
 cargo test --test yarax_e2e
 ```
 
-CI: `.github/workflows/rust-ci.yml` on Windows 2022 and Ubuntu 24.04 includes locked builds, Rust CLI subprocess checks, desktop worker lifecycle tests, real pinned YARA-X tests, Clippy and package verification. On each OS the unsigned local test bundle contains `turkuazav` (CLI), `turkuazav-desktop` (GUI), `README.md`, `SECURITY.md` and `SHA256SUMS`.
+CI: `.github/workflows/rust-ci.yml` on Windows 2022 and Ubuntu 24.04 includes locked builds, Rust CLI subprocess checks, desktop worker lifecycle tests, real pinned YARA-X tests, Clippy and package verification. On each OS the unsigned local test bundle contains `turkuazav` (CLI), `turkuazav-desktop` (GUI), `turkuazav-service` (service host), `README.md`, `SECURITY.md` and `SHA256SUMS` (plus an uninstalled example unit/env file on Linux).
 
 - Windows: `TurkuazAV-0.3.1-RUST-UNSIGNED-LOCAL-TEST-win-x64.zip`
 - Linux: `TurkuazAV-0.3.1-RUST-UNSIGNED-LOCAL-TEST-linux-x64.tar.gz`
@@ -79,6 +79,20 @@ CI: `.github/workflows/rust-ci.yml` on Windows 2022 and Ubuntu 24.04 includes lo
 - Both packages are **unsigned CI test artifacts only**, not installers or published production releases. Linux GUI requires compatible system display/graphics dependencies.
 
 A successful CI build does **not** prove interactive GUI behavior on end-user machines; file picker, clipboard and cancellation still require real Windows/Linux manual smoke tests.
+
+## OS service host preview (not installed)
+
+The new `turkuazav-service` binary supports `--once` (one-shot acceptance smoke), `--foreground` (long-lived read-only observer) and on Windows `--scm` (Service Control Manager entrypoint). It requires an existing **absolute** watched directory and an interval of 1-60 seconds; `..` components and a symlink/reparse root are refused. The root must be authorized and made readable by the **least-privileged OS service account** in a separate administrator-controlled provisioning step. The application does not create accounts, modify ACLs, install services, request elevation or create persistent scan logs.
+
+The Linux template `deploy/service/turkuazav-preview.service` and `deploy/service/preview.env.example` are **uninstalled examples**. The unit uses `Type=simple` (not a ready/healthy notification), read-only filesystem hardening and `Restart=on-failure`; the operator must provision a service user, immutable binary path, watched directory, environment file and approve the sandbox restrictions before installation. A healthy process is **not** proof of antivirus protection. Windows SCM integration supports STOP/SHUTDOWN, but service registration, restricted ACL/account configuration and SCM recovery policy are not automated and **not tested under a live SCM**.
+
+For an unprivileged local test with no service registration:
+
+```bash
+cargo run --bin turkuazav-service -- --once /absolute/watched/directory 2
+```
+
+CI exercises `--once` from a relocated extracted test package on both OSes, and Linux subprocess SIGTERM shutdown, but does not install systemd/SCM or prove production service recovery. Exit on native watcher failure is nonzero so an externally configured supervisor may restart it. Cooperative shutdown may block if an OS file read hangs.
 
 ## Security / compatibility
 
