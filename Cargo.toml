@@ -26,6 +26,10 @@ name = "turkuazav-desktop"
 path = "rust/src/bin/desktop.rs"
 required-features = ["desktop"]
 
+[[bin]]
+name = "turkuazav-service"
+path = "rust/src/bin/service_host.rs"
+
 [features]
 default = []
 desktop = ["dep:eframe", "dep:rfd", "dep:arboard", "dep:chrono", "dep:dirs"]
