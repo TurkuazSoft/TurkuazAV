@@ -234,7 +234,12 @@ impl DesktopApp {
             .default_width(184.0)
             .show(ctx, |ui| {
                 ui.add_space(15.0);
-                ui.heading(egui::RichText::new("TurkuazAV").color(TEAL).size(22.0).strong());
+                ui.heading(
+                    egui::RichText::new("TurkuazAV")
+                        .color(TEAL)
+                        .size(22.0)
+                        .strong(),
+                );
                 ui.label(egui::RichText::new("Horizon • Deneysel").weak().size(12.0));
                 ui.add_space(26.0);
                 for (page, caption) in [
@@ -244,11 +249,9 @@ impl DesktopApp {
                     (Page::Modules, "◇  Modüller"),
                     (Page::Settings, "⚙  Ayarlar"),
                 ] {
-                    let button = egui::Button::new(
-                        egui::RichText::new(caption).size(15.0),
-                    )
-                    .min_size(egui::vec2(ui.available_width(), 38.0))
-                    .selected(self.page == page);
+                    let button = egui::Button::new(egui::RichText::new(caption).size(15.0))
+                        .min_size(egui::vec2(ui.available_width(), 38.0))
+                        .selected(self.page == page);
                     if ui.add(button).clicked() {
                         self.page = page;
                     }
@@ -272,7 +275,11 @@ impl DesktopApp {
                 ui.separator();
                 ui.colored_label(WARNING, "Deneysel sürüm");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let caption = if self.light_theme { "Koyu tema" } else { "Açık tema" };
+                    let caption = if self.light_theme {
+                        "Koyu tema"
+                    } else {
+                        "Açık tema"
+                    };
                     if ui.button(caption).clicked() {
                         self.light_theme = !self.light_theme;
                     }
@@ -293,28 +300,42 @@ impl DesktopApp {
 
     fn target_picker(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_wrapped(|ui| {
-            if ui.add_enabled(!self.busy, egui::Button::new("Dosya seç").fill(TEAL)).clicked() {
+            if ui
+                .add_enabled(!self.busy, egui::Button::new("Dosya seç").fill(TEAL))
+                .clicked()
+            {
                 self.pick();
             }
-            if ui.add_enabled(!self.busy, egui::Button::new("Klasör seç")).clicked() {
+            if ui
+                .add_enabled(!self.busy, egui::Button::new("Klasör seç"))
+                .clicked()
+            {
                 self.pick_folder();
             }
         });
         ui.add_space(8.0);
         ui.label(egui::RichText::new("Analiz hedefi").strong());
-        let target = self.selected.as_ref()
+        let target = self
+            .selected
+            .as_ref()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "Henüz bir dosya veya klasör seçilmedi.".to_owned());
         ui.add(egui::Label::new(target).wrap());
         ui.add_space(10.0);
         ui.horizontal_wrapped(|ui| {
-            if ui.add_enabled(
-                !self.busy && self.selected.is_some(),
-                egui::Button::new("SHA-256 analizini başlat").fill(TEAL),
-            ).clicked() {
+            if ui
+                .add_enabled(
+                    !self.busy && self.selected.is_some(),
+                    egui::Button::new("SHA-256 analizini başlat").fill(TEAL),
+                )
+                .clicked()
+            {
                 self.start();
             }
-            if ui.add_enabled(self.busy, egui::Button::new("İptal")).clicked() {
+            if ui
+                .add_enabled(self.busy, egui::Button::new("İptal"))
+                .clicked()
+            {
                 self.cancel.store(true, Ordering::Relaxed);
                 self.status = "İptal istendi...".into();
             }
@@ -348,7 +369,10 @@ impl DesktopApp {
             ));
             ui.label(format!(
                 "Dosya boyutu: {}",
-                report.size_bytes.map(|n| format!("{n} bayt")).unwrap_or_else(|| "-".into())
+                report
+                    .size_bytes
+                    .map(|n| format!("{n} bayt"))
+                    .unwrap_or_else(|| "-".into())
             ));
             if let Some(digest) = &report.sha256 {
                 ui.label(egui::RichText::new(digest).monospace());
@@ -377,18 +401,24 @@ impl DesktopApp {
             self.history.clear();
             self.status = "Oturum geçmişi temizlendi.".into();
         }
-        egui::ScrollArea::vertical().max_height(210.0).show(ui, |ui| {
-            if self.history.is_empty() {
-                ui.label("Bu oturumda kayıt bulunmuyor.");
-            }
-            for item in &self.history {
-                ui.label(item);
-            }
-        });
+        egui::ScrollArea::vertical()
+            .max_height(210.0)
+            .show(ui, |ui| {
+                if self.history.is_empty() {
+                    ui.label("Bu oturumda kayıt bulunmuyor.");
+                }
+                for item in &self.history {
+                    ui.label(item);
+                }
+            });
     }
 
     fn overview(&mut self, ui: &mut egui::Ui) {
-        section_title(ui, "Dosya Analiz Aracı", "SHA-256 hesaplama ve dosya inceleme önizlemesi");
+        section_title(
+            ui,
+            "Dosya Analiz Aracı",
+            "SHA-256 hesaplama ve dosya inceleme önizlemesi",
+        );
         self.warning_banner(ui);
         ui.add_space(14.0);
         egui::Frame::group(ui.style())
@@ -411,14 +441,34 @@ impl DesktopApp {
     }
 
     fn modules(&self, ui: &mut egui::Ui) {
-        section_title(ui, "Koruma modülleri", "Mevcut özellikler ile planlananları açıkça ayırıyoruz.");
-        dashboard_card(ui, "SHA-256 dosya analizi", "Kullanılabilir • Dosya bütünlük özeti üretir.");
+        section_title(
+            ui,
+            "Koruma modülleri",
+            "Mevcut özellikler ile planlananları açıkça ayırıyoruz.",
+        );
+        dashboard_card(
+            ui,
+            "SHA-256 dosya analizi",
+            "Kullanılabilir • Dosya bütünlük özeti üretir.",
+        );
         ui.add_space(8.0);
-        dashboard_card(ui, "Gerçek zamanlı koruma", "Mevcut değil • Dosyaları otomatik izlemiyor.");
+        dashboard_card(
+            ui,
+            "Gerçek zamanlı koruma",
+            "Mevcut değil • Dosyaları otomatik izlemiyor.",
+        );
         ui.add_space(8.0);
-        dashboard_card(ui, "Karantina ve tehdit engelleme", "Mevcut değil • Dosyaları engellemiyor veya taşımıyor.");
+        dashboard_card(
+            ui,
+            "Karantina ve tehdit engelleme",
+            "Mevcut değil • Dosyaları engellemiyor veya taşımıyor.",
+        );
         ui.add_space(8.0);
-        dashboard_card(ui, "Zararlı yazılım tespiti", "Bu GUI önizlemesinde etkin değil.");
+        dashboard_card(
+            ui,
+            "Zararlı yazılım tespiti",
+            "Bu GUI önizlemesinde etkin değil.",
+        );
     }
 
     fn settings(&mut self, ui: &mut egui::Ui) {
