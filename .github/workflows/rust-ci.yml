@@ -49,6 +49,8 @@ jobs:
         run: cargo test --locked --test cli_smoke
       - name: Service host subprocess and signal smoke
         run: cargo test --locked --test service_host_smoke
+      - name: Signed service update gate contract
+        run: cargo test --locked --test service_update_contract
       - name: Rust lint
         run: cargo clippy --locked --lib --bin turkuazav --bin turkuazav-service --tests -- -D warnings
       - name: Build release CLI

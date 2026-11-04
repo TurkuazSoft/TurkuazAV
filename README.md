@@ -80,6 +80,12 @@ CI: `.github/workflows/rust-ci.yml` on Windows 2022 and Ubuntu 24.04 includes lo
 
 A successful CI build does **not** prove interactive GUI behavior on end-user machines; file picker, clipboard and cancellation still require real Windows/Linux manual smoke tests.
 
+## Signed service-update verification gate (library only)
+
+`rust/src/update.rs` adds `verify_service_update`: a read-only, bounded RSA-PSS-SHA256 verification gate for a signed **service executable snapshot** (maximum 64 MiB). Its strict manifest (`turkuazav.service-update.v1`) covers sequence, publisher key ID, three-part version, target OS/architecture, binary size and SHA-256. The signed domain `TurkuazAV.service-update.v1` is separate from YARA rule-package signatures, so a rule signature cannot authorize a service executable.
+
+The library requires an **independently trusted publisher keyring** and a **separately protected update-version state file**. It rejects unknown publishers, malformed/extra fields, wrong architecture, tampering, stale versions and same-sequence different payloads. The caller receives an immutable view of the verified binary bytes, avoiding reliance on a mutable source path. **Verification does not change any installed service, write update state, download files, or grant trust to a CLI PEM.** Installation would require a future privileged updater to stage and re-hash the executable, maintain its own protected rollback journal, switch and health-check the OS service, and only then atomically commit the 40-byte anti-rollback state. An interrupted install must be recoverable without treating an uninstalled version as committed. This verifier alone is not a signed updater or automatic AV protection.
+
 ## OS service host preview (not installed)
 
 The new `turkuazav-service` binary supports `--once` (one-shot acceptance smoke), `--foreground` (long-lived read-only observer) and on Windows `--scm` (Service Control Manager entrypoint). It requires an existing **absolute** watched directory and an interval of 1-60 seconds; `..` components and a symlink/reparse root are refused. The root must be authorized and made readable by the **least-privileged OS service account** in a separate administrator-controlled provisioning step. The application does not create accounts, modify ACLs, install services, request elevation or create persistent scan logs.

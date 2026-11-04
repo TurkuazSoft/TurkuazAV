@@ -27,3 +27,9 @@ The storage location must be protected by host permissions. Cooperative writers 
 Publisher trust-root provisioning, secure signed key rotation, protected service installation, process sandboxing and full process-tree termination, remaining local privilege/temporary-directory tamper hardening, target filesystem TOCTOU hardening, additional filesystem fault-injection and crash/power-loss testing, fuzz and performance coverage, real interactive GUI smoke, production signing, quarantine and real-time blocking.
 
 Do not run unsigned preview artifacts as the device's only endpoint protection.
+
+## Service executable update verification (separate from rule updates)
+
+`rust/src/update.rs` exposes only a **read-only** signed service-update verifier. Domain-separated RSA-PSS-SHA256 covers strict signed metadata (schema, monotonically increasing sequence, independently trusted publisher ID, numeric version, OS, arch, executable length and digest). A bounded snapshot of the verified bytes is returned so the original user-controlled path does not need to be trusted again. The verifier checks a separate 40-byte service-update anti-rollback state but **does not advance it**; only a future trusted installer could commit an accepted update after installation and successful service health acceptance.
+
+The optimistic state check may race a cooperating writer; a real installer must take the protected state lock and re-check before an atomic install and commit. A rollback journal, crash consistency for switching executable targets, publisher key provisioning/rotation, OS code signing, elevated provisioning and real version-to-version migration are not implemented. A SHA-256 digest alone or a caller-supplied PEM is **not** a production publisher trust root.

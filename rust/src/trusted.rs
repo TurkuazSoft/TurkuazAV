@@ -62,6 +62,14 @@ impl TrustedKeyring {
             .map(String::as_str)
             .context("Untrusted publisher")
     }
+    pub(crate) fn verify_signed_payload(
+        &self,
+        id: &str,
+        payload: &[u8],
+        signature: &[u8],
+    ) -> Result<()> {
+        rules::verify_signature(payload, signature, self.key(id)?)
+    }
 }
 
 #[derive(Debug)]
@@ -72,7 +80,7 @@ pub struct VerifiedRulePackage {
     pub manifest_fingerprint: [u8; 32],
 }
 
-fn valid_key_id(id: &str) -> bool {
+pub(crate) fn valid_key_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id.bytes().all(|c| {

@@ -12,6 +12,7 @@ pub mod rules;
 pub mod scan;
 pub mod service;
 pub mod trusted;
+pub mod update;
 pub mod worker;
 
 pub use monitor::{ChangeKind, DirectoryObserver, ObservedChange};
@@ -25,4 +26,5 @@ pub use trusted::{
     accept_version, scan_trusted_rules, scan_trusted_rules_with_cancel, verify_package,
     TrustedKeyring, TrustedScanPaths, VerifiedRulePackage,
 };
+pub use update::{verify_service_update, VerifiedServiceUpdate};
 pub use worker::{SupervisedScanWorker, WorkerFault, WorkerHealth, WorkerPhase};
