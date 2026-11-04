@@ -540,10 +540,7 @@ fn legacy_v1_pending_record_reports_no_candidate_digest() {
             candidate_integrity: turkuazav::PendingCandidateInspection::LegacyRecordWithoutDigest,
         }
     );
-    assert_eq!(
-        fs::read(&marker).unwrap(),
-        record.to_string().as_bytes()
-    );
+    assert_eq!(fs::read(&marker).unwrap(), record.to_string().as_bytes());
 }
 
 #[test]
