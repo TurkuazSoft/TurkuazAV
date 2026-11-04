@@ -31,7 +31,10 @@ if sudo systemctl list-unit-files --all --no-legend "$unit" | grep -Fq "$unit"; 
     exit 1
 fi
 
-sandbox="$(sudo mktemp -d /run/turkuazav-ci.XXXXXXXX)"
+# /run may be mounted noexec on hosted runners. Stage the executable
+# within a root-owned executable filesystem; the entire fixture is removed
+# by the EXIT trap and no installed service is modified.
+sandbox="$(sudo mktemp -d /usr/local/bin/turkuazav-ci.XXXXXXXX)"
 rendered="$(mktemp)"
 created=0
 cleanup() {
@@ -62,6 +65,12 @@ sudo chmod 0644 "$sandbox/preview.env"
 
 test_user="$(id -un)"
 test_group="$(id -gn)"
+# Verify actual unprivileged execution, not just Unix mode bits (noexec
+# mount or inaccessible parent would otherwise fail in systemd later).
+if ! sudo -u "$test_user" "$sandbox/turkuazav-service" --once "$sandbox/watched" 1 >/dev/null; then
+    echo "Service executable cannot run from the isolated CI fixture." >&2
+    exit 1
+fi
 sed \
     -e "s|^User=turkuazav$|User=$test_user|" \
     -e "s|^Group=turkuazav$|Group=$test_group|" \
