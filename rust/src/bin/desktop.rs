@@ -65,6 +65,18 @@ struct DesktopApp {
     status: String,
     report: Option<FileScanResult>,
     history: VecDeque<String>,
+    page: Page,
+    light_theme: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Page {
+    #[default]
+    Overview,
+    Analysis,
+    History,
+    Modules,
+    Settings,
 }
 
 impl Default for DesktopApp {
@@ -78,6 +90,8 @@ impl Default for DesktopApp {
             status: "Tarama için dosya bekleniyor.".into(),
             report: None,
             history: VecDeque::new(),
+            page: Page::Overview,
+            light_theme: false,
         }
     }
 }
@@ -190,118 +204,279 @@ impl DesktopApp {
     }
 }
 
+// @dev-id TAV-HORIZON-UI-001
+// @purpose Provide a navigable native dashboard for the existing read-only SHA-256 worker.
+// @reason A polished preview must never imply actual malware protection.
+const TEAL: egui::Color32 = egui::Color32::from_rgb(20, 204, 197);
+const WARNING: egui::Color32 = egui::Color32::from_rgb(237, 178, 69);
+
+fn section_title(ui: &mut egui::Ui, title: &str, description: &str) {
+    ui.heading(egui::RichText::new(title).size(25.0).strong());
+    ui.label(egui::RichText::new(description).size(14.0).weak());
+    ui.add_space(14.0);
+}
+
+fn dashboard_card(ui: &mut egui::Ui, title: &str, detail: &str) {
+    egui::Frame::group(ui.style())
+        .inner_margin(egui::Margin::same(14))
+        .show(ui, |ui| {
+            ui.set_min_width(170.0);
+            ui.label(egui::RichText::new(title).strong().size(15.0));
+            ui.add_space(6.0);
+            ui.label(detail);
+        });
+}
+
+impl DesktopApp {
+    fn sidebar(&mut self, ctx: &egui::Context) {
+        egui::SidePanel::left("horizon_navigation")
+            .resizable(false)
+            .default_width(184.0)
+            .show(ctx, |ui| {
+                ui.add_space(15.0);
+                ui.heading(egui::RichText::new("TurkuazAV").color(TEAL).size(22.0).strong());
+                ui.label(egui::RichText::new("Horizon • Deneysel").weak().size(12.0));
+                ui.add_space(26.0);
+                for (page, caption) in [
+                    (Page::Overview, "⌂  Genel Bakış"),
+                    (Page::Analysis, "▤  Dosya Analizi"),
+                    (Page::History, "◷  Geçmiş"),
+                    (Page::Modules, "◇  Modüller"),
+                    (Page::Settings, "⚙  Ayarlar"),
+                ] {
+                    let button = egui::Button::new(
+                        egui::RichText::new(caption).size(15.0),
+                    )
+                    .min_size(egui::vec2(ui.available_width(), 38.0))
+                    .selected(self.page == page);
+                    if ui.add(button).clicked() {
+                        self.page = page;
+                    }
+                    ui.add_space(6.0);
+                }
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                    ui.label(egui::RichText::new("SHA-256 önizleme").weak().size(11.0));
+                });
+            });
+    }
+
+    fn top_bar(&mut self, ctx: &egui::Context) {
+        egui::TopBottomPanel::top("horizon_header").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new(format!("TurkuazAV v{}", env!("CARGO_PKG_VERSION")))
+                        .strong()
+                        .size(16.0),
+                );
+                ui.separator();
+                ui.colored_label(WARNING, "Deneysel sürüm");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let caption = if self.light_theme { "Koyu tema" } else { "Açık tema" };
+                    if ui.button(caption).clicked() {
+                        self.light_theme = !self.light_theme;
+                    }
+                });
+            });
+            ui.add_space(4.0);
+        });
+    }
+
+    fn warning_banner(&self, ui: &mut egui::Ui) {
+        egui::Frame::group(ui.style()).show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.colored_label(WARNING, "ⓘ");
+                ui.label(PREVIEW_WARNING);
+            });
+        });
+    }
+
+    fn target_picker(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal_wrapped(|ui| {
+            if ui.add_enabled(!self.busy, egui::Button::new("Dosya seç").fill(TEAL)).clicked() {
+                self.pick();
+            }
+            if ui.add_enabled(!self.busy, egui::Button::new("Klasör seç")).clicked() {
+                self.pick_folder();
+            }
+        });
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new("Analiz hedefi").strong());
+        let target = self.selected.as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "Henüz bir dosya veya klasör seçilmedi.".to_owned());
+        ui.add(egui::Label::new(target).wrap());
+        ui.add_space(10.0);
+        ui.horizontal_wrapped(|ui| {
+            if ui.add_enabled(
+                !self.busy && self.selected.is_some(),
+                egui::Button::new("SHA-256 analizini başlat").fill(TEAL),
+            ).clicked() {
+                self.start();
+            }
+            if ui.add_enabled(self.busy, egui::Button::new("İptal")).clicked() {
+                self.cancel.store(true, Ordering::Relaxed);
+                self.status = "İptal istendi...".into();
+            }
+            if self.busy {
+                ui.spinner();
+            }
+        });
+        ui.add_space(8.0);
+        ui.label(&self.status);
+        if self.busy {
+            ui.label("Analiz devam ediyor. İşlem sayıları canlı olarak güncellenir.");
+        }
+    }
+
+    fn progress_cards(&self, ui: &mut egui::Ui) {
+        let (hashed, skipped, failed) = self.progress.counts();
+        ui.horizontal_wrapped(|ui| {
+            dashboard_card(ui, "İşlenen dosya", &hashed.to_string());
+            dashboard_card(ui, "Atlanan dosya", &skipped.to_string());
+            dashboard_card(ui, "Hata", &failed.to_string());
+        });
+    }
+
+    fn report_card(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Son analiz raporu");
+        if let Some(report) = &self.report {
+            ui.label(format!(
+                "Durum: {:?} {}",
+                report.status,
+                report.details.as_deref().unwrap_or("")
+            ));
+            ui.label(format!(
+                "Dosya boyutu: {}",
+                report.size_bytes.map(|n| format!("{n} bayt")).unwrap_or_else(|| "-".into())
+            ));
+            if let Some(digest) = &report.sha256 {
+                ui.label(egui::RichText::new(digest).monospace());
+                if ui.button("SHA-256 kopyala").clicked() {
+                    if arboard::Clipboard::new()
+                        .and_then(|mut clipboard| clipboard.set_text(digest.clone()))
+                        .is_ok()
+                    {
+                        self.status = "Hash panoya kopyalandı.".into();
+                    } else {
+                        log_event("COPY_FAILED", "ClipboardError");
+                        self.status = "Panoya kopyalanamadı.".into();
+                    }
+                }
+            }
+        } else {
+            ui.label("Henüz tamamlanmış analiz raporu yok.");
+        }
+        ui.small("SHA-256 sonucu bir dosyanın güvenli olduğunu kanıtlamaz.");
+    }
+
+    fn history_card(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Oturum geçmişi");
+        ui.label("Son 20 kayıt • Yalnızca bellekte tutulur.");
+        if ui.button("Oturum geçmişini temizle").clicked() {
+            self.history.clear();
+            self.status = "Oturum geçmişi temizlendi.".into();
+        }
+        egui::ScrollArea::vertical().max_height(210.0).show(ui, |ui| {
+            if self.history.is_empty() {
+                ui.label("Bu oturumda kayıt bulunmuyor.");
+            }
+            for item in &self.history {
+                ui.label(item);
+            }
+        });
+    }
+
+    fn overview(&mut self, ui: &mut egui::Ui) {
+        section_title(ui, "Dosya Analiz Aracı", "SHA-256 hesaplama ve dosya inceleme önizlemesi");
+        self.warning_banner(ui);
+        ui.add_space(14.0);
+        egui::Frame::group(ui.style())
+            .inner_margin(egui::Margin::same(16))
+            .show(ui, |ui| {
+                ui.heading("Yeni analiz başlat");
+                ui.add_space(8.0);
+                self.target_picker(ui);
+                ui.add_space(14.0);
+                self.progress_cards(ui);
+            });
+        ui.add_space(14.0);
+        egui::Frame::group(ui.style())
+            .inner_margin(egui::Margin::same(16))
+            .show(ui, |ui| self.report_card(ui));
+        ui.add_space(12.0);
+        egui::Frame::group(ui.style())
+            .inner_margin(egui::Margin::same(16))
+            .show(ui, |ui| self.history_card(ui));
+    }
+
+    fn modules(&self, ui: &mut egui::Ui) {
+        section_title(ui, "Koruma modülleri", "Mevcut özellikler ile planlananları açıkça ayırıyoruz.");
+        dashboard_card(ui, "SHA-256 dosya analizi", "Kullanılabilir • Dosya bütünlük özeti üretir.");
+        ui.add_space(8.0);
+        dashboard_card(ui, "Gerçek zamanlı koruma", "Mevcut değil • Dosyaları otomatik izlemiyor.");
+        ui.add_space(8.0);
+        dashboard_card(ui, "Karantina ve tehdit engelleme", "Mevcut değil • Dosyaları engellemiyor veya taşımıyor.");
+        ui.add_space(8.0);
+        dashboard_card(ui, "Zararlı yazılım tespiti", "Bu GUI önizlemesinde etkin değil.");
+    }
+
+    fn settings(&mut self, ui: &mut egui::Ui) {
+        section_title(ui, "Ayarlar", "Masaüstü görünümü ve sürüm bilgileri");
+        ui.checkbox(&mut self.light_theme, "Açık tema kullan");
+        ui.add_space(10.0);
+        ui.label(format!("Uygulama sürümü: {}", env!("CARGO_PKG_VERSION")));
+        ui.label("Arayüz: TurkuazAV Horizon (deneysel)");
+        ui.label("Geçmiş: Yalnızca bellek • en fazla 20 kayıt");
+        ui.add_space(12.0);
+        self.warning_banner(ui);
+    }
+}
+
 impl eframe::App for DesktopApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.poll();
         if self.busy {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
+        let mut visuals = if self.light_theme {
+            egui::Visuals::light()
+        } else {
+            egui::Visuals::dark()
+        };
+        if !self.light_theme {
+            visuals.panel_fill = egui::Color32::from_rgb(7, 23, 34);
+            visuals.window_fill = egui::Color32::from_rgb(12, 34, 47);
+        }
+        visuals.selection.bg_fill = TEAL;
+        ctx.set_visuals(visuals);
+
+        self.top_bar(ctx);
+        self.sidebar(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading(format!("TurkuazAV v{}", env!("CARGO_PKG_VERSION")));
-            ui.strong("DOSYA ANALİZİ / RUST PREVIEW");
-            ui.separator();
-            ui.colored_label(egui::Color32::YELLOW, PREVIEW_WARNING);
-            ui.add_space(15.0);
-            ui.group(|ui| {
-                ui.heading("Dosya veya klasör seçimi");
-                ui.label(
-                    self.selected
-                        .as_ref()
-                        .map(|p| p.display().to_string())
-                        .unwrap_or_else(|| "Henüz dosya veya klasör seçilmedi.".into()),
-                );
-                ui.horizontal(|ui| {
-                    if ui
-                        .add_enabled(!self.busy, egui::Button::new("Dosya seç"))
-                        .clicked()
-                    {
-                        self.pick();
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                ui.add_space(12.0);
+                match self.page {
+                    Page::Overview => self.overview(ui),
+                    Page::Analysis => {
+                        section_title(ui, "Dosya Analizi", "Bir dosya veya klasörün SHA-256 özetini hesaplayın.");
+                        self.warning_banner(ui);
+                        ui.add_space(12.0);
+                        self.target_picker(ui);
+                        ui.add_space(12.0);
+                        self.progress_cards(ui);
+                        ui.separator();
+                        self.report_card(ui);
                     }
-                    if ui
-                        .add_enabled(!self.busy, egui::Button::new("Klasör seç"))
-                        .clicked()
-                    {
-                        self.pick_folder();
+                    Page::History => {
+                        section_title(ui, "Geçmiş", "Bu uygulama oturumunda tamamlanan analizler.");
+                        self.history_card(ui);
                     }
-                    if ui
-                        .add_enabled(
-                            !self.busy && self.selected.is_some(),
-                            egui::Button::new("SHA-256 tara"),
-                        )
-                        .clicked()
-                    {
-                        self.start();
-                    }
-                    if ui
-                        .add_enabled(self.busy, egui::Button::new("İptal"))
-                        .clicked()
-                    {
-                        self.cancel.store(true, Ordering::Relaxed);
-                        self.status = "İptal istendi...".into();
-                    }
-                    if self.busy {
-                        ui.spinner();
-                    }
-                });
-                ui.label(&self.status);
-                if self.busy {
-                    let (hashed, skipped, failed) = self.progress.counts();
-                    ui.label(format!(
-                        "İlerleme: {} işlendi, {} atlandı, {} hata.",
-                        hashed, skipped, failed
-                    ));
+                    Page::Modules => self.modules(ui),
+                    Page::Settings => self.settings(ui),
                 }
-            });
-            ui.add_space(12.0);
-            ui.group(|ui| {
-                ui.heading("Son analiz raporu");
-                if let Some(report) = &self.report {
-                    ui.label(format!(
-                        "Durum: {:?} {}",
-                        report.status,
-                        report.details.as_deref().unwrap_or("")
-                    ));
-                    ui.label(format!(
-                        "Dosya boyutu: {}",
-                        report
-                            .size_bytes
-                            .map(|n| format!("{n} bayt"))
-                            .unwrap_or_else(|| "-".into())
-                    ));
-                    if let Some(digest) = &report.sha256 {
-                        ui.monospace(digest);
-                        if ui.button("SHA-256 kopyala").clicked() {
-                            if arboard::Clipboard::new()
-                                .and_then(|mut c| c.set_text(digest.clone()))
-                                .is_ok()
-                            {
-                                self.status = "Hash panoya kopyalandı.".into();
-                            } else {
-                                log_event("COPY_FAILED", "ClipboardError");
-                                self.status = "Panoya kopyalanamadı.".into();
-                            }
-                        }
-                    }
-                } else {
-                    ui.label("Rapor yok.");
-                }
-                ui.small("SHA-256 bir güvenlik hükmü değildir.");
-            });
-            ui.add_space(12.0);
-            ui.group(|ui| {
-                ui.heading("Bu oturumdaki taramalar");
-                ui.label("Geçmiş sadece bellektedir; diske kaydedilmez.");
-                if ui.button("Oturum geçmişini temizle").clicked() {
-                    self.history.clear();
-                    self.status = "Oturum geçmişi temizlendi.".into();
-                }
-                egui::ScrollArea::vertical()
-                    .max_height(150.0)
-                    .show(ui, |ui| {
-                        for item in &self.history {
-                            ui.label(item);
-                        }
-                    });
+                ui.add_space(20.0);
+                ui.small("Gerçek zamanlı koruma, karantina ve tehdit engelleme bu sürümde mevcut değildir.");
             });
         });
     }
