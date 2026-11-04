@@ -85,8 +85,25 @@ fn lock_transaction(install_root: &Path) -> Result<fs::File> {
 
 fn check_state_path(install_root: &Path, state_file: &Path) -> Result<()> {
     ensure!(
-        state_file.is_absolute(),
-        "Update state path must be absolute"
+        safe_report_path(install_root) && safe_report_path(state_file),
+        "Update paths must be absolute and free of traversal components"
+    );
+    let state_name = state_file
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("Invalid service update state filename")?;
+
+    // @dev-id TAV-UPDATE-PATH-010
+    // @purpose Reject state names that collide with the transaction lock,
+    // pending marker, its lock sidecar, or the private staging namespace.
+    // @reason Such collisions can make activation succeed but state commit
+    // fail, leaving the running service and version record inconsistent.
+    ensure!(
+        state_name != PENDING_MARKER
+            && state_name != TRANSACTION_LOCK
+            && state_name != ".turkuazav-service-update.txn"
+            && !state_name.starts_with(".turkuazav-update-"),
+        "Reserved service update state path"
     );
     let state_parent = state_file
         .parent()
@@ -121,13 +138,17 @@ fn require_new_sequence(state_file: &Path, sequence: i64) -> Result<()> {
     }
 }
 
-fn stage_verified(install_root: &Path, verified: &VerifiedServiceUpdate) -> Result<PathBuf> {
+fn candidate_path(install_root: &Path, sequence: i64) -> PathBuf {
     let filename = if cfg!(windows) {
-        format!("turkuazav-service-seq-{}.exe", verified.sequence())
+        format!("turkuazav-service-seq-{sequence}.exe")
     } else {
-        format!("turkuazav-service-seq-{}", verified.sequence())
+        format!("turkuazav-service-seq-{sequence}")
     };
-    let target = install_root.join(filename);
+    install_root.join(filename)
+}
+
+fn stage_verified(install_root: &Path, verified: &VerifiedServiceUpdate) -> Result<PathBuf> {
+    let target = candidate_path(install_root, verified.sequence());
     // A crash residue or concurrent installation must not be overwritten.
     ensure!(
         !target.exists()
@@ -364,8 +385,12 @@ pub fn apply_verified_service_update(
 ) -> Result<CommittedServiceUpdate> {
     let _transaction_lock = lock_transaction(install_root)?;
     check_state_path(install_root, state_file)?;
-    require_new_sequence(state_file, verified.sequence())?;
+    ensure!(
+        state_file != candidate_path(install_root, verified.sequence()),
+        "Update state path collides with service candidate"
+    );
     refuse_unresolved_update(install_root)?;
+    require_new_sequence(state_file, verified.sequence())?;
     let previous = service
         .current_binary()
         .context("Cannot identify prior service")?;

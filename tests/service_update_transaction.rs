@@ -416,3 +416,52 @@ fn pending_inspection_rejects_invalid_schema_paths_and_links() {
         assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
     }
 }
+
+#[test]
+fn reserved_update_state_paths_fail_before_activation() {
+    let f = Fixture::new();
+    let suffix = if cfg!(windows) { ".exe" } else { "" };
+    let disallowed = [
+        ".turkuazav-service-update.pending".to_string(),
+        ".turkuazav-service-update.txn.lock".to_string(),
+        ".turkuazav-service-update.txn".to_string(),
+        ".turkuazav-update-remainder".to_string(),
+        format!("turkuazav-service-seq-7{suffix}"),
+    ];
+    for name in disallowed {
+        let mut adapter = FakeAdapter::new(&f.old);
+        let forbidden = f.temp.path().join(name);
+        assert!(
+            apply_verified_service_update(
+                f.temp.path(),
+                &forbidden,
+                &f.verified,
+                &mut adapter,
+            )
+            .is_err(),
+            "Reserved or colliding state path must be rejected"
+        );
+        assert_eq!(adapter.activated, 0);
+        assert_eq!(adapter.restored, 0);
+        assert_eq!(adapter.active, f.old);
+        assert!(!f.temp.path().join(format!("turkuazav-service-seq-7{suffix}")).exists());
+    }
+    assert!(!f.state.exists());
+}
+
+#[test]
+fn traversal_state_paths_fail_without_service_switch() {
+    let f = Fixture::new();
+    let mut adapter = FakeAdapter::new(&f.old);
+    let traversing = f.temp.path().join("subdir").join("..").join("version-state");
+    assert!(apply_verified_service_update(
+        f.temp.path(),
+        &traversing,
+        &f.verified,
+        &mut adapter,
+    )
+    .is_err());
+    assert_eq!(adapter.activated, 0);
+    assert_eq!(adapter.restored, 0);
+    assert!(!f.state.exists());
+}
