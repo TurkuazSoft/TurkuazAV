@@ -20,7 +20,9 @@ use std::{
 };
 use turkuazav::{
     apply_verified_service_update,
-    update::{parse_service_update_manifest, service_update_signature_payload, SERVICE_UPDATE_SCHEMA},
+    update::{
+        parse_service_update_manifest, service_update_signature_payload, SERVICE_UPDATE_SCHEMA,
+    },
     update_transaction::ServiceActivation,
     verify_service_update, TrustedKeyring, VerifiedServiceUpdate,
 };
@@ -57,7 +59,8 @@ impl Fixture {
             "targetArch": "x86_64",
             "binarySize": 20,
             "binarySha256": hex::encode(Sha256::digest(b"trusted update bytes")),
-        }).to_string();
+        })
+        .to_string();
         let parsed = parse_service_update_manifest(json.as_bytes()).unwrap();
         let signed = SigningKey::<Sha256>::new(key)
             .sign_with_rng(&mut OsRng, &service_update_signature_payload(&parsed))
@@ -69,16 +72,16 @@ impl Fixture {
         // Mutate the untrusted source after verification; the orchestrator
         // must only stage the signed in-memory snapshot.
         fs::write(binary, b"replaced untrusted source").unwrap();
-        Self { temp, old, state, verified }
+        Self {
+            temp,
+            old,
+            state,
+            verified,
+        }
     }
 
     fn run(&self, adapter: &mut FakeAdapter) -> Result<turkuazav::CommittedServiceUpdate> {
-        apply_verified_service_update(
-            self.temp.path(),
-            &self.state,
-            &self.verified,
-            adapter,
-        )
+        apply_verified_service_update(self.temp.path(), &self.state, &self.verified, adapter)
     }
 }
 
@@ -120,7 +123,10 @@ impl ServiceActivation for FakeAdapter {
 
     fn check_health(&mut self, staged: &Path) -> Result<()> {
         ensure!(self.active == staged, "Unexpected staged executable");
-        ensure!(fs::read(staged)? == b"trusted update bytes", "Staged bytes changed");
+        ensure!(
+            fs::read(staged)? == b"trusted update bytes",
+            "Staged bytes changed"
+        );
         if let Some(path) = &self.conflict_state {
             // Competing updater: higher accepted sequence means that blindly
             // rolling back could violate a newly committed trust boundary.
@@ -150,7 +156,10 @@ fn healthy_staged_snapshot_is_committed_only_after_acceptance() {
     let result = f.run(&mut adapter).unwrap();
     assert_eq!(result.sequence, 7);
     assert_eq!(result.version, "0.3.1");
-    assert_eq!(fs::read(&result.installed_binary).unwrap(), b"trusted update bytes");
+    assert_eq!(
+        fs::read(&result.installed_binary).unwrap(),
+        b"trusted update bytes"
+    );
     assert_eq!(adapter.active, result.installed_binary);
     assert_eq!(adapter.activated, 1);
     assert_eq!(adapter.restored, 0);
@@ -170,7 +179,17 @@ fn failed_activation_restores_old_binary_and_preserves_state() {
     assert_eq!(adapter.active, f.old);
     assert_eq!(adapter.restored, 1);
     assert!(!f.state.exists());
-    assert_eq!(fs::read_dir(f.temp.path()).unwrap().filter_map(|v| v.ok()).filter(|v| v.file_name().to_string_lossy().starts_with("turkuazav-service-seq-")).count(), 0);
+    assert_eq!(
+        fs::read_dir(f.temp.path())
+            .unwrap()
+            .filter_map(|v| v.ok())
+            .filter(|v| v
+                .file_name()
+                .to_string_lossy()
+                .starts_with("turkuazav-service-seq-"))
+            .count(),
+        0
+    );
 }
 
 #[test]
@@ -193,7 +212,10 @@ fn failed_restore_keeps_candidate_for_manual_recovery() {
     let err = f.run(&mut adapter).unwrap_err();
     assert!(err.to_string().contains("manual recovery"));
     assert!(!f.state.exists());
-    assert!(adapter.active.exists(), "Unrecovered candidate must remain available");
+    assert!(
+        adapter.active.exists(),
+        "Unrecovered candidate must remain available"
+    );
 }
 
 #[test]
@@ -215,8 +237,12 @@ fn redirected_root_and_invalid_state_location_are_rejected() {
     let mut adapter = FakeAdapter::new(&f.old);
     let outside = tempfile::tempdir().unwrap();
     assert!(apply_verified_service_update(
-        f.temp.path(), &outside.path().join("state"), &f.verified, &mut adapter
-    ).is_err());
+        f.temp.path(),
+        &outside.path().join("state"),
+        &f.verified,
+        &mut adapter
+    )
+    .is_err());
     assert_eq!(adapter.activated, 0);
     #[cfg(unix)]
     {
@@ -224,8 +250,12 @@ fn redirected_root_and_invalid_state_location_are_rejected() {
         let link = outside.path().join("linked");
         symlink(f.temp.path(), &link).unwrap();
         assert!(apply_verified_service_update(
-            &link, &link.join("state"), &f.verified, &mut adapter
-        ).is_err());
+            &link,
+            &link.join("state"),
+            &f.verified,
+            &mut adapter
+        )
+        .is_err());
         assert_eq!(adapter.activated, 0);
     }
 }
@@ -235,7 +265,10 @@ fn existing_staging_collision_fails_closed() {
     let f = Fixture::new();
     let mut adapter = FakeAdapter::new(&f.old);
     let suffix = if cfg!(windows) { ".exe" } else { "" };
-    let collision = f.temp.path().join(format!("turkuazav-service-seq-7{suffix}"));
+    let collision = f
+        .temp
+        .path()
+        .join(format!("turkuazav-service-seq-7{suffix}"));
     fs::write(&collision, b"another candidate").unwrap();
     assert!(f.run(&mut adapter).is_err());
     assert_eq!(fs::read(&collision).unwrap(), b"another candidate");

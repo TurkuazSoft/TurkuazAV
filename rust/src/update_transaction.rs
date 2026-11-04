@@ -40,7 +40,10 @@ pub struct CommittedServiceUpdate {
 }
 
 fn regular_file(path: &Path) -> Result<()> {
-    ensure!(path.is_absolute(), "Expected an absolute service executable");
+    ensure!(
+        path.is_absolute(),
+        "Expected an absolute service executable"
+    );
     let meta = fs::symlink_metadata(path).context("Cannot inspect service executable")?;
     ensure!(
         meta.is_file() && !is_reparse_or_symlink(&meta),
@@ -79,7 +82,10 @@ fn lock_transaction(install_root: &Path) -> Result<fs::File> {
 }
 
 fn check_state_path(install_root: &Path, state_file: &Path) -> Result<()> {
-    ensure!(state_file.is_absolute(), "Update state path must be absolute");
+    ensure!(
+        state_file.is_absolute(),
+        "Update state path must be absolute"
+    );
     let state_parent = state_file
         .parent()
         .context("Invalid service update state path")?
@@ -122,7 +128,9 @@ fn stage_verified(install_root: &Path, verified: &VerifiedServiceUpdate) -> Resu
     let target = install_root.join(filename);
     // A crash residue or concurrent installation must not be overwritten.
     ensure!(
-        !target.exists() && fs::symlink_metadata(&target).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
+        !target.exists()
+            && fs::symlink_metadata(&target)
+                .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
         "Staged version path already exists or is inaccessible"
     );
     let mut file = tempfile::Builder::new()
@@ -171,7 +179,9 @@ pub fn apply_verified_service_update(
     let _transaction_lock = lock_transaction(install_root)?;
     check_state_path(install_root, state_file)?;
     require_new_sequence(state_file, verified.sequence())?;
-    let previous = service.current_binary().context("Cannot identify prior service")?;
+    let previous = service
+        .current_binary()
+        .context("Cannot identify prior service")?;
     regular_file(&previous)?;
     let candidate = stage_verified(install_root, verified)?;
     // The active path may be mutated by the OS/service process; the adapter

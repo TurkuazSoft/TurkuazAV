@@ -28,5 +28,7 @@ pub use trusted::{
     TrustedKeyring, TrustedScanPaths, VerifiedRulePackage,
 };
 pub use update::{verify_service_update, VerifiedServiceUpdate};
-pub use update_transaction::{apply_verified_service_update, CommittedServiceUpdate, ServiceActivation};
+pub use update_transaction::{
+    apply_verified_service_update, CommittedServiceUpdate, ServiceActivation,
+};
 pub use worker::{SupervisedScanWorker, WorkerFault, WorkerHealth, WorkerPhase};
