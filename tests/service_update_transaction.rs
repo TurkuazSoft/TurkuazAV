@@ -325,3 +325,94 @@ fn failure_to_activate_clears_pending_marker_only_after_restore() {
         .exists());
     assert!(!f.state.exists());
 }
+
+#[test]
+fn pending_inspection_is_read_only_and_rejects_unresolved_reentry() {
+    let f = Fixture::new();
+    assert_eq!(
+        turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).unwrap(),
+        turkuazav::PendingUpdateInspection::NoPending
+    );
+    let mut adapter = FakeAdapter::new(&f.old);
+    adapter.fail_health = true;
+    adapter.fail_restore = true;
+    assert!(f.run(&mut adapter).is_err());
+    let marker = f.temp.path().join(".turkuazav-service-update.pending");
+    let before = fs::read(&marker).unwrap();
+
+    assert_eq!(
+        turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).unwrap(),
+        turkuazav::PendingUpdateInspection::NeedsManualReview {
+            sequence: 7,
+            version_record_matches_marker: false,
+        }
+    );
+    assert_eq!(fs::read(&marker).unwrap(), before);
+    assert!(!f.state.exists());
+    assert!(f.run(&mut adapter).is_err());
+    assert_eq!(adapter.activated, 1);
+}
+
+#[test]
+fn accepted_record_match_still_requires_manual_reconciliation() {
+    let f = Fixture::new();
+    let mut adapter = FakeAdapter::new(&f.old);
+    adapter.fail_restore = true;
+    adapter.fail_health = true;
+    assert!(f.run(&mut adapter).is_err());
+    turkuazav::accept_version(
+        &f.state,
+        f.verified.sequence(),
+        f.verified.manifest_fingerprint(),
+    )
+    .unwrap();
+    let saved = fs::read(&f.state).unwrap();
+    assert_eq!(
+        turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).unwrap(),
+        turkuazav::PendingUpdateInspection::NeedsManualReview {
+            sequence: 7,
+            version_record_matches_marker: true,
+        }
+    );
+    assert!(f.run(&mut adapter).is_err());
+    assert_eq!(adapter.activated, 1);
+    assert_eq!(fs::read(&f.state).unwrap(), saved);
+}
+
+#[test]
+fn pending_inspection_rejects_invalid_schema_paths_and_links() {
+    let f = Fixture::new();
+    let marker = f.temp.path().join(".turkuazav-service-update.pending");
+    fs::write(&marker, b"invalid json").unwrap();
+    assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
+    let valid = serde_json::json!({
+        "schema": "turkuazav.service-update-pending.v1",
+        "sequence": 7,
+        "manifestSha256": hex::encode(f.verified.manifest_fingerprint()),
+        "previousBinary": f.old.to_string_lossy(),
+        "candidateBinary": f.temp.path().join("candidate").to_string_lossy(),
+    });
+    let mut bad_path = valid.clone();
+    bad_path["candidateBinary"] = serde_json::json!("../relative");
+    fs::write(&marker, bad_path.to_string()).unwrap();
+    assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
+    let mut bad_schema = valid.clone();
+    bad_schema["extraField"] = serde_json::json!(true);
+    fs::write(&marker, bad_schema.to_string()).unwrap();
+    assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
+    fs::write(&marker, valid.to_string()).unwrap();
+    assert!(matches!(
+        turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).unwrap(),
+        turkuazav::PendingUpdateInspection::NeedsManualReview { .. }
+    ));
+    fs::write(&marker, vec![b'X'; 8193]).unwrap();
+    assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        fs::remove_file(&marker).unwrap();
+        symlink(&f.old, &marker).unwrap();
+        assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
+    }
+}

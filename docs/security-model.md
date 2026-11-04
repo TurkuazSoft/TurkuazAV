@@ -40,4 +40,6 @@ The optimistic state check may race a cooperating writer; a real installer must 
 
 This preview deliberately ships **no real platform activation adapter**. The provided test-only adapter models failure cases without controlling any OS service. The transaction lock does not prevent other privileged code from writing the version state via a different API. A synchronized, protected pending-update marker now blocks a subsequent transaction if an earlier operation was interrupted or could not be reconciled. It records only diagnostic identity, never authority to restore or execute an untrusted path. A full crash-recovery journal and replay-safe automatic recovery remain unimplemented.
 
+A separate read-only pending-state inspector now rejects malformed, oversized or redirected records and reports whether the protected 40-byte sequence/fingerprint matches the pending marker. It does not follow paths embedded in the marker, clear the latch, or authorize rollback. Inspection may race writers and is **not** an automatic crash-recovery mechanism.
+
 Process-restart recovery, durable pointer updates, ACL provisioning and signer root bootstrap are incomplete: do not connect the transaction to a production SCM/systemd service until these safeguards are implemented and separately tested.

@@ -29,6 +29,7 @@ pub use trusted::{
 };
 pub use update::{verify_service_update, VerifiedServiceUpdate};
 pub use update_transaction::{
-    apply_verified_service_update, CommittedServiceUpdate, ServiceActivation,
+    apply_verified_service_update, inspect_pending_service_update, CommittedServiceUpdate,
+    PendingUpdateInspection, ServiceActivation,
 };
 pub use worker::{SupervisedScanWorker, WorkerFault, WorkerHealth, WorkerPhase};

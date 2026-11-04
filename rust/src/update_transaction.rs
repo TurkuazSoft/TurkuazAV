@@ -234,6 +234,117 @@ fn clear_pending_update(install_root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Diagnostic report only. Even a matching 40-byte record is NOT proof that
+/// the service is running, healthy, or safe to restore; the pending latch must
+/// never be cleared automatically from this result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PendingUpdateInspection {
+    NoPending,
+    NeedsManualReview {
+        sequence: i64,
+        version_record_matches_marker: bool,
+    },
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PendingUpdateRecord {
+    schema: String,
+    sequence: i64,
+    #[serde(rename = "manifestSha256")]
+    manifest_sha256: String,
+    #[serde(rename = "previousBinary")]
+    previous_binary: String,
+    #[serde(rename = "candidateBinary")]
+    candidate_binary: String,
+}
+
+fn safe_report_path(path: &Path) -> bool {
+    path.is_absolute()
+        && !path
+            .components()
+            .any(|part| matches!(part, std::path::Component::CurDir | std::path::Component::ParentDir))
+}
+
+/// @dev-id TAV-UPDATE-PENDING-020
+/// @purpose Inspect an unresolved update without following journal paths.
+/// @reason A broken or interrupted transaction needs safe operator diagnosis.
+/// @contract Bounded strict-schema inspection; no service activation, path
+/// execution, pending-marker deletion, or 40-byte state mutation. This is an
+/// observation that may race a concurrent updater and is NOT a recovery grant.
+pub fn inspect_pending_service_update(
+    install_root: &Path,
+    state_file: &Path,
+) -> Result<PendingUpdateInspection> {
+    let root_meta = fs::symlink_metadata(install_root)
+        .context("Cannot inspect update installation root")?;
+    ensure!(
+        safe_report_path(install_root)
+            && root_meta.is_dir()
+            && !is_reparse_or_symlink(&root_meta),
+        "Unsafe update installation root"
+    );
+    check_state_path(install_root, state_file)?;
+    let pending_path = install_root.join(PENDING_MARKER);
+    match fs::symlink_metadata(&pending_path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(PendingUpdateInspection::NoPending);
+        }
+        Err(error) => return Err(error).context("Cannot inspect pending update record"),
+        Ok(meta) => ensure!(
+            meta.is_file()
+                && !is_reparse_or_symlink(&meta)
+                && meta.len() > 0
+                && meta.len() <= MAX_PENDING_RECORD_BYTES as u64,
+            "Invalid or redirected pending update record"
+        ),
+    }
+
+    let bytes = read_bounded(&pending_path, MAX_PENDING_RECORD_BYTES)?;
+    let record: PendingUpdateRecord =
+        serde_json::from_slice(&bytes).context("Corrupt pending update record")?;
+    let previous = Path::new(&record.previous_binary);
+    let candidate = Path::new(&record.candidate_binary);
+    ensure!(
+        record.schema == "turkuazav.service-update-pending.v1"
+            && record.sequence > 0
+            && record.manifest_sha256.len() == 64
+            && record
+                .manifest_sha256
+                .bytes()
+                .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
+            && safe_report_path(previous)
+            && safe_report_path(candidate)
+            && previous != candidate
+            && candidate.parent() == Some(install_root),
+        "Invalid pending update record fields"
+    );
+    let fingerprint = hex::decode(&record.manifest_sha256)?;
+
+    // Compare only the persisted 40-byte record; the marker's claimed paths
+    // are never opened or used as service activation / rollback authority.
+    let matches_record = match fs::symlink_metadata(state_file) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+        Err(error) => return Err(error).context("Cannot inspect version state"),
+        Ok(meta) => {
+            ensure!(
+                meta.is_file() && !is_reparse_or_symlink(&meta) && meta.len() == 40,
+                "Invalid or redirected version state"
+            );
+            let bytes = fs::read(state_file).context("Cannot read version state")?;
+            ensure!(bytes.len() == 40, "Corrupt version state");
+            let saved_sequence = i64::from_le_bytes(bytes[..8].try_into()?);
+            ensure!(saved_sequence > 0, "Corrupt version sequence");
+            saved_sequence == record.sequence
+                && bytes[8..].ct_eq(&fingerprint).unwrap_u8() == 1
+        }
+    };
+    Ok(PendingUpdateInspection::NeedsManualReview {
+        sequence: record.sequence,
+        version_record_matches_marker: matches_record,
+    })
+}
+
 /// @dev-id TAV-UPDATE-TRANSACTION-010
 /// @purpose Stage signed bytes, run an adapter health gate, then advance state.
 /// @reason Downgrade protection may only be committed after service acceptance.
