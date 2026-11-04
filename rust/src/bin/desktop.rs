@@ -344,7 +344,59 @@ fn log_event(code: &str, kind: &str) {
     })();
 }
 
+/// @dev-id TAV-DESKTOP-SMOKE-010
+/// @purpose Run the shipped desktop scan worker without opening a window.
+/// @reason CI must execute the packaged GUI binary, not only compile it.
+/// @contract Local harmless sample, bounded wait, exact SHA-256 assertion.
+/// This does not validate native window rendering, pickers or clipboard.
+fn run_headless_self_test() -> std::io::Result<()> {
+    let fixture = tempfile::tempdir()?;
+    let sample = fixture.path().join("harmless-sample.txt");
+    fs::write(&sample, b"abc")?;
+    let mut app = DesktopApp::default();
+    app.choose(sample);
+    app.start();
+
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    while app.busy && std::time::Instant::now() < deadline {
+        app.poll();
+        if app.busy {
+            thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+    if app.busy {
+        return Err(std::io::Error::other("Desktop scan worker timed out"));
+    }
+    let expected = "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD";
+    let correct = app.progress.counts() == (1, 0, 0)
+        && app.report.as_ref().is_some_and(|report| {
+            report.status == ScanStatus::Hashed
+                && report.size_bytes == Some(3)
+                && report.sha256.as_deref() == Some(expected)
+        })
+        && app.status.contains("1 işlendi");
+    if !correct {
+        return Err(std::io::Error::other("Desktop scan worker contract mismatch"));
+    }
+    println!(
+        "RUST_DESKTOP_HEADLESS_SMOKE=PASS version={}",
+        env!("CARGO_PKG_VERSION")
+    );
+    Ok(())
+}
+
 fn main() -> eframe::Result<()> {
+    // The test mode is opt-in; normal users still launch the native window.
+    if std::env::args_os()
+        .skip(1)
+        .any(|arg| arg == std::ffi::OsString::from("--headless-self-test"))
+    {
+        if let Err(error) = run_headless_self_test() {
+            eprintln!("RUST_DESKTOP_HEADLESS_SMOKE=FAIL: {error}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
     log_event("APP_START", "Startup");
     eframe::run_native(
         &format!(
@@ -359,6 +411,11 @@ fn main() -> eframe::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn headless_self_test_runs_real_desktop_scan_worker() {
+        run_headless_self_test().unwrap();
+    }
 
     #[test]
     fn disconnected_worker_restores_controls_and_clears_report() {

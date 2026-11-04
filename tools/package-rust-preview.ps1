@@ -137,6 +137,23 @@ try {
             Pop-Location
         }
         Write-Host 'RUST_NATIVE_PACKAGE_SERVICE_SMOKE=PASS'
+
+        # @dev-id TAV-DESKTOP-SMOKE-020
+        # @purpose Exercise the exact archived GUI binary without a display.
+        # @reason Compilation alone does not prove the delivered GUI binary
+        # can launch its scan worker on the target OS and relocated directory.
+        $desktopBinary = Join-Path $verify "turkuazav-desktop$extension"
+        Push-Location $smokeDir
+        try {
+            $desktopText = (& $desktopBinary --headless-self-test 2>&1 | Out-String)
+            if ($LASTEXITCODE -ne 0) { throw 'Unpacked desktop headless smoke failed.' }
+            if ($desktopText -notmatch "RUST_DESKTOP_HEADLESS_SMOKE=PASS version=$([regex]::Escape($version))") {
+                throw 'Unpacked desktop worker contract failed.'
+            }
+        } finally {
+            Pop-Location
+        }
+        Write-Host 'RUST_NATIVE_PACKAGE_DESKTOP_HEADLESS_SMOKE=PASS'
     } finally {
         if (Test-Path -LiteralPath $smokeDir) {
             Remove-Item -LiteralPath $smokeDir -Recurse -Force
