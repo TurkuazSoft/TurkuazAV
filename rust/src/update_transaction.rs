@@ -21,6 +21,8 @@ use std::{
 use subtle::ConstantTimeEq;
 
 const TRANSACTION_LOCK: &str = ".turkuazav-service-update.txn.lock";
+const PENDING_MARKER: &str = ".turkuazav-service-update.pending";
+const MAX_PENDING_RECORD_BYTES: usize = 8192;
 
 /// The platform-specific adapter MUST independently authorize the service
 /// name, identity, executable path and actual process/health state. This is
@@ -161,13 +163,87 @@ fn stage_verified(install_root: &Path, verified: &VerifiedServiceUpdate) -> Resu
     Ok(target)
 }
 
+
+/// An unresolved marker is a fail-closed latch, NOT a recovery instruction.
+/// Never auto-restore a binary by interpreting untrusted on-disk path strings.
+fn refuse_unresolved_update(install_root: &Path) -> Result<()> {
+    match fs::symlink_metadata(install_root.join(PENDING_MARKER)) {
+        Ok(_) => bail!("Unresolved service-update transaction; manual recovery required"),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error).context("Cannot inspect pending service-update marker"),
+    }
+}
+
+/// @dev-id TAV-UPDATE-PENDING-010
+/// @purpose Persist intent before an adapter can change the OS service.
+/// @reason A process crash must not silently allow a second transaction.
+/// @contract Creates a new, synchronized operator-only record; it is never
+/// used as authority to activate, restore, or accept a service binary.
+fn record_pending_update(
+    install_root: &Path,
+    previous: &Path,
+    candidate: &Path,
+    verified: &VerifiedServiceUpdate,
+) -> Result<()> {
+    let previous = previous
+        .to_str()
+        .context("Non-UTF8 previous service path not supported by pending record")?;
+    let candidate = candidate
+        .to_str()
+        .context("Non-UTF8 candidate path not supported by pending record")?;
+    let record = serde_json::json!({
+        "schema": "turkuazav.service-update-pending.v1",
+        "sequence": verified.sequence(),
+        "manifestSha256": hex::encode(verified.manifest_fingerprint()),
+        "previousBinary": previous,
+        "candidateBinary": candidate,
+    })
+    .to_string();
+    ensure!(
+        record.len() <= MAX_PENDING_RECORD_BYTES,
+        "Service-update pending record too large"
+    );
+
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options
+        .open(install_root.join(PENDING_MARKER))
+        .context("Cannot create protected pending update record")?;
+    file.write_all(record.as_bytes())?;
+    file.sync_all()?;
+    #[cfg(unix)]
+    fs::File::open(install_root)
+        .and_then(|dir| dir.sync_all())
+        .context("Cannot synchronize pending update directory")?;
+    Ok(())
+}
+
+/// Only clear the latch after a known-good restoration or committed update.
+/// A cleanup/sync error is ambiguous, so the caller must stop for reconciliation.
+fn clear_pending_update(install_root: &Path) -> Result<()> {
+    fs::remove_file(install_root.join(PENDING_MARKER))
+        .context("Cannot clear pending service-update record")?;
+    #[cfg(unix)]
+    fs::File::open(install_root)
+        .and_then(|dir| dir.sync_all())
+        .context("Cannot synchronize cleared pending update directory")?;
+    Ok(())
+}
+
 /// @dev-id TAV-UPDATE-TRANSACTION-010
 /// @purpose Stage signed bytes, run an adapter health gate, then advance state.
 /// @reason Downgrade protection may only be committed after service acceptance.
 /// @contract In-process failures before commit attempt restore the previous
 /// executable. Failed restore leaves the candidate for operator recovery.
 /// Errors while committing the state have UNCERTAIN durability, so automatic
-/// downgrade/rollback is forbidden at that point. This preview has NO durable
+/// downgrade/rollback is forbidden at that point. An unresolved persistent
+/// marker blocks subsequent updates after interruption but CANNOT restore a
+/// service. This preview has NO complete durable
 /// crash journal or real SCM/systemd adapter, and must not be used as a
 /// production installer. Protected directory/account trust is caller-provided.
 pub fn apply_verified_service_update(
@@ -179,11 +255,15 @@ pub fn apply_verified_service_update(
     let _transaction_lock = lock_transaction(install_root)?;
     check_state_path(install_root, state_file)?;
     require_new_sequence(state_file, verified.sequence())?;
+    refuse_unresolved_update(install_root)?;
     let previous = service
         .current_binary()
         .context("Cannot identify prior service")?;
     regular_file(&previous)?;
     let candidate = stage_verified(install_root, verified)?;
+    // Record the pending switch before calling any platform activation hook.
+    // If journal creation fails, no service activation has been attempted.
+    record_pending_update(install_root, &previous, &candidate, verified)?;
     // The active path may be mutated by the OS/service process; the adapter
     // must verify an actual running process and is never allowed to claim a
     // malware verdict from this operation.
@@ -199,6 +279,8 @@ pub fn apply_verified_service_update(
             );
         }
         fs::remove_file(&candidate).context("Restore succeeded but candidate cleanup failed")?;
+        clear_pending_update(install_root)
+            .context("Restored service but pending record cleanup needs reconciliation")?;
         return Err(error).context("Service activation rejected; previous service restored");
     }
     // No rollback after this point: accept_version can return an error AFTER
@@ -210,6 +292,8 @@ pub fn apply_verified_service_update(
         verified.manifest_fingerprint(),
     )
     .context("Service accepted but version commit is uncertain; manual recovery required")?;
+    clear_pending_update(install_root)
+        .context("Service version accepted but pending record cleanup failed; manual recovery required")?;
     Ok(CommittedServiceUpdate {
         sequence: verified.sequence(),
         version: verified.version().to_owned(),
