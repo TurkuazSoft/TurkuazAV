@@ -3,7 +3,7 @@
 # Amac: GitHub-hosted Linux runner'inda izole systemd servis yasam dongusu
 # Modul - FileType: Tests - Bash
 # Version: 0.3.1
-# Aciklama: Gercek systemctl start/stop/restart, sinirli cleanup, kurulum yok
+# Aciklama: Start/stop/restart, staged upgrade/rollback, cleanup; kurulum yok
 # Bagimli Oldugu Katman: Tool | Service | Config
 
 set -Eeuo pipefail
@@ -125,3 +125,85 @@ state="$(sudo systemctl show "$unit" -p ActiveState --value)"
     exit 1
 }
 echo 'RUST_SYSTEMD_LIVE_STOP=PASS'
+
+# @dev-id TAV-SYSTEMD-UPGRADE-010
+# @purpose Test versioned, offline binary staging and rollback on this run's
+# temporary unit only. This does NOT install or upgrade a production service.
+trusted_hash="$(sha256sum "$source_bin" | awk '{print $1}')"
+upgrade_binary="$sandbox/turkuazav-service-v2"
+sudo install -m 0555 "$source_bin" "$upgrade_binary"
+[[ "$(sudo sha256sum "$upgrade_binary" | awk '{print $1}')" == "$trusted_hash" ]] || {
+    echo "Staged systemd binary did not match the trusted fixture." >&2
+    exit 1
+}
+
+upgrade_unit="$(mktemp)"
+sed "s|$sandbox/turkuazav-service --foreground|$upgrade_binary --foreground|" \
+    "$rendered" > "$upgrade_unit"
+grep -Fq "ExecStart=$upgrade_binary --foreground" "$upgrade_unit" || {
+    echo "systemd upgrade unit was not rendered correctly." >&2
+    exit 1
+}
+sudo install -m 0644 "$upgrade_unit" "/run/systemd/system/$unit"
+rm -f -- "$upgrade_unit"
+sudo systemd-analyze verify "/run/systemd/system/$unit"
+sudo systemctl daemon-reload
+sudo systemctl start "$unit"
+deadline=$((SECONDS + 30))
+upgraded=0
+while (( SECONDS < deadline )); do
+    state="$(sudo systemctl show "$unit" -p ActiveState --value)"
+    current_pid="$(sudo systemctl show "$unit" -p MainPID --value)"
+    if [[ "$state" == active && "$current_pid" =~ ^[1-9][0-9]*$ ]]; then
+        active_binary="$(sudo readlink -f "/proc/$current_pid/exe" || true)"
+        if [[ "$active_binary" == "$upgrade_binary" ]]; then
+            upgraded=1
+            break
+        fi
+    fi
+    sleep 0.2
+done
+[[ "$upgraded" == 1 ]] || { echo "systemd upgrade did not run staged binary." >&2; exit 1; }
+sudo systemctl stop "$unit"
+echo 'RUST_SYSTEMD_OFFLINE_UPGRADE=PASS'
+
+# Negative staging: a corrupted candidate cannot mutate the unit or run.
+bad_binary="$sandbox/turkuazav-service-tampered"
+printf 'bad' | sudo tee "$bad_binary" >/dev/null
+[[ "$(sudo sha256sum "$bad_binary" | awk '{print $1}')" != "$trusted_hash" ]] || {
+    echo "Corrupt candidate unexpectedly passed the hash gate." >&2
+    exit 1
+}
+sudo rm -f -- "$bad_binary"
+[[ "$(sudo systemctl show "$unit" -p ExecStart --value)" == *"$upgrade_binary"* ]] || {
+    echo "Rejected candidate unexpectedly changed the systemd unit." >&2
+    exit 1
+}
+echo 'RUST_SYSTEMD_TAMPER_REJECTED=PASS'
+
+# Restore and execute the original verified configuration before cleanup.
+sudo install -m 0644 "$rendered" "/run/systemd/system/$unit"
+sudo systemd-analyze verify "/run/systemd/system/$unit"
+sudo systemctl daemon-reload
+sudo systemctl start "$unit"
+deadline=$((SECONDS + 30))
+restored=0
+while (( SECONDS < deadline )); do
+    state="$(sudo systemctl show "$unit" -p ActiveState --value)"
+    current_pid="$(sudo systemctl show "$unit" -p MainPID --value)"
+    if [[ "$state" == active && "$current_pid" =~ ^[1-9][0-9]*$ ]]; then
+        active_binary="$(sudo readlink -f "/proc/$current_pid/exe" || true)"
+        if [[ "$active_binary" == "$sandbox/turkuazav-service" ]]; then
+            restored=1
+            break
+        fi
+    fi
+    sleep 0.2
+done
+[[ "$restored" == 1 ]] || { echo "systemd rollback did not restore the original binary." >&2; exit 1; }
+sudo systemctl stop "$unit"
+[[ "$(sudo systemctl show "$unit" -p ActiveState --value)" == inactive ]] || {
+    echo "systemd rollback service did not stop." >&2
+    exit 1
+}
+echo 'RUST_SYSTEMD_OFFLINE_ROLLBACK=PASS'

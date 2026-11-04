@@ -2,7 +2,7 @@
 # Amac: GitHub-hosted Windows runner'inda gecici SCM servisini baslat/durdur
 # Modul - FileType: Tests - PowerShell
 # Version: 0.3.1
-# Aciklama: LocalService, demand-only, crash recovery ve kontrollu cleanup; installer degil
+# Aciklama: LocalService, crash recovery, offline upgrade/rollback; installer degil
 # Bagimli Oldugu Katman: Tool | Service | Config
 
 $ErrorActionPreference = 'Stop'
@@ -132,6 +132,75 @@ try {
         throw 'Normal SCM STOP incorrectly triggered restart or retained a process.'
     }
     Write-Host 'RUST_SCM_STOP_NO_RESTART=PASS'
+
+    # @dev-id TAV-SCM-UPGRADE-010
+    # @purpose Exercise an offline, integrity-gated upgrade and rollback on
+    # the unique temporary LocalService fixture. No production installation.
+    $trustedHash = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash
+    $upgraded = Join-Path $base 'turkuazav-service-v2.exe'
+    Copy-Item -LiteralPath $source -Destination $upgraded
+    if ((Get-FileHash -LiteralPath $upgraded -Algorithm SHA256).Hash -cne $trustedHash) {
+        throw 'Staged service candidate failed the trusted fixture hash check.'
+    }
+
+    $upgradedImagePath = ('"{0}" --scm "{1}" 1' -f $upgraded, $watch)
+    & sc.exe config $serviceName 'binPath=' $upgradedImagePath | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot switch the isolated SCM binary path.' }
+    $configured = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+    if ($null -eq $configured -or $configured.PathName -notlike "*$upgraded*" -or
+        $configured.StartMode -ne 'Manual' -or $configured.StartName -notmatch 'LocalService') {
+        throw 'SCM upgrade changed the expected identity or was not applied.'
+    }
+
+    $service = Get-Service -Name $serviceName
+    $service.Start()
+    $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Running, [TimeSpan]::FromSeconds(35))
+    $liveUpgraded = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+    if ($null -eq $liveUpgraded -or $liveUpgraded.State -ne 'Running' -or
+        [uint32]$liveUpgraded.ProcessId -eq 0) {
+        throw 'Upgraded SCM service is not running.'
+    }
+    $actualUpgrade = Get-CimInstance Win32_Process -Filter "ProcessId=$($liveUpgraded.ProcessId)"
+    if ($null -eq $actualUpgrade -or $actualUpgrade.ExecutablePath -ine $upgraded) {
+        throw 'SCM upgrade launched an unexpected executable.'
+    }
+    $service.Stop()
+    $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Stopped, [TimeSpan]::FromSeconds(35))
+    Write-Host 'RUST_SCM_OFFLINE_UPGRADE=PASS'
+
+    # Inject a tampered candidate before registration. It must be rejected
+    # without ever executing or reconfiguring the service.
+    $tampered = Join-Path $base 'turkuazav-service-tampered.exe'
+    [System.IO.File]::WriteAllBytes($tampered, [byte[]](0x62, 0x61, 0x64))
+    if ((Get-FileHash -LiteralPath $tampered -Algorithm SHA256).Hash -ceq $trustedHash) {
+        throw 'Deliberately corrupted test candidate unexpectedly matched.'
+    }
+    Remove-Item -LiteralPath $tampered -Force
+    $unchanged = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+    if ($null -eq $unchanged -or $unchanged.PathName -notlike "*$upgraded*") {
+        throw 'Failed staging unexpectedly modified the live SCM configuration.'
+    }
+    Write-Host 'RUST_SCM_TAMPER_REJECTED=PASS'
+
+    # Restore the prior verified configuration and re-launch the exact
+    # original executable before deleting this CI-only service.
+    & sc.exe config $serviceName 'binPath=' $imagePath | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot roll back isolated SCM binary path.' }
+    $service = Get-Service -Name $serviceName
+    $service.Start()
+    $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Running, [TimeSpan]::FromSeconds(35))
+    $restored = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+    if ($null -eq $restored -or $restored.State -ne 'Running' -or
+        [uint32]$restored.ProcessId -eq 0 -or $restored.PathName -notlike "*$binary*") {
+        throw 'SCM rollback did not restore the original service configuration.'
+    }
+    $actualRollback = Get-CimInstance Win32_Process -Filter "ProcessId=$($restored.ProcessId)"
+    if ($null -eq $actualRollback -or $actualRollback.ExecutablePath -ine $binary) {
+        throw 'SCM rollback launched an unexpected executable.'
+    }
+    $service.Stop()
+    $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Stopped, [TimeSpan]::FromSeconds(35))
+    Write-Host 'RUST_SCM_OFFLINE_ROLLBACK=PASS'
 } finally {
     if ($created) {
         try {
