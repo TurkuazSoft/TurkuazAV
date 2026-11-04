@@ -391,7 +391,7 @@ fn main() -> eframe::Result<()> {
     // The test mode is opt-in; normal users still launch the native window.
     if std::env::args_os()
         .skip(1)
-        .any(|arg| arg == std::ffi::OsString::from("--headless-self-test"))
+        .any(|arg| arg == "--headless-self-test")
     {
         if let Err(error) = run_headless_self_test() {
             eprintln!("RUST_DESKTOP_HEADLESS_SMOKE=FAIL: {error}");
