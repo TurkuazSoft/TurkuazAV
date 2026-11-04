@@ -376,7 +376,9 @@ fn run_headless_self_test() -> std::io::Result<()> {
         })
         && app.status.contains("1 işlendi");
     if !correct {
-        return Err(std::io::Error::other("Desktop scan worker contract mismatch"));
+        return Err(std::io::Error::other(
+            "Desktop scan worker contract mismatch",
+        ));
     }
     println!(
         "RUST_DESKTOP_HEADLESS_SMOKE=PASS version={}",
