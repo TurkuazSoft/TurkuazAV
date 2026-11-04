@@ -62,7 +62,10 @@ fn signed_fixture(
 fn publisher_signed_update_is_domain_separated_and_read_only() {
     let root = tempfile::tempdir().unwrap();
     let key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
-    let pem = key.to_public_key().to_public_key_pem(Default::default()).unwrap();
+    let pem = key
+        .to_public_key()
+        .to_public_key_pem(Default::default())
+        .unwrap();
     let ring = TrustedKeyring::from_pinned_pem(vec![("update-publisher".into(), pem)]).unwrap();
     let state = root.path().join("service-update-state");
     let (bin, man, sig) = signed_fixture(root.path(), &key, 2, b"test service binary");
@@ -95,7 +98,10 @@ fn publisher_signed_update_is_domain_separated_and_read_only() {
 fn unsigned_tampered_and_wrong_publisher_inputs_fail_closed() {
     let root = tempfile::tempdir().unwrap();
     let key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
-    let pem = key.to_public_key().to_public_key_pem(Default::default()).unwrap();
+    let pem = key
+        .to_public_key()
+        .to_public_key_pem(Default::default())
+        .unwrap();
     let ring = TrustedKeyring::from_pinned_pem(vec![("update-publisher".into(), pem)]).unwrap();
     let state = root.path().join("service-state");
     let (bin, man, sig) = signed_fixture(root.path(), &key, 1, b"good binary");
@@ -110,8 +116,7 @@ fn unsigned_tampered_and_wrong_publisher_inputs_fail_closed() {
     assert!(verify_service_update(&bin, &man, &sig, &unknown, &state).is_err());
 
     let (bin, man, sig) = signed_fixture(root.path(), &key, 2, b"good signed binary");
-    let mut value: serde_json::Value =
-        serde_json::from_slice(&fs::read(&man).unwrap()).unwrap();
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&man).unwrap()).unwrap();
     value["targetOs"] = serde_json::json!(if cfg!(windows) { "linux" } else { "windows" });
     fs::write(&man, value.to_string()).unwrap();
     assert!(verify_service_update(&bin, &man, &sig, &ring, &state).is_err());
@@ -131,20 +136,51 @@ fn strict_schema_and_separate_rule_signature_domain() {
     assert!(payload.starts_with(b"TurkuazAV.service-update.v1\n"));
     assert!(!payload.starts_with(b"TurkuazAV.rule-package.v1\n"));
     assert!(parse_service_update_manifest(valid.replace("0.3.1", "01.3.1").as_bytes()).is_err());
-    assert!(parse_service_update_manifest(valid.replace("0.3.1", "0.3.1-extra").as_bytes()).is_err());
-    assert!(parse_service_update_manifest(valid.replace("\"sequence\":1", "\"sequence\":0").as_bytes()).is_err());
-    assert!(parse_service_update_manifest(valid.replace("\"binarySize\":1", "\"binarySize\":0").as_bytes()).is_err());
-    assert!(parse_service_update_manifest(valid.replace("\"binarySize\":1", &format!("\"binarySize\":{}", MAX_SERVICE_BINARY_BYTES + 1)).as_bytes()).is_err());
-    assert!(parse_service_update_manifest(valid.replace("\"binarySha256\":\"", "\"binarySha256\":\"A").as_bytes()).is_err());
+    assert!(
+        parse_service_update_manifest(valid.replace("0.3.1", "0.3.1-extra").as_bytes()).is_err()
+    );
+    assert!(parse_service_update_manifest(
+        valid.replace("\"sequence\":1", "\"sequence\":0").as_bytes()
+    )
+    .is_err());
+    assert!(parse_service_update_manifest(
+        valid
+            .replace("\"binarySize\":1", "\"binarySize\":0")
+            .as_bytes()
+    )
+    .is_err());
+    assert!(parse_service_update_manifest(
+        valid
+            .replace(
+                "\"binarySize\":1",
+                &format!("\"binarySize\":{}", MAX_SERVICE_BINARY_BYTES + 1)
+            )
+            .as_bytes()
+    )
+    .is_err());
+    assert!(parse_service_update_manifest(
+        valid
+            .replace("\"binarySha256\":\"", "\"binarySha256\":\"A")
+            .as_bytes()
+    )
+    .is_err());
     assert!(parse_service_update_manifest(valid.replace("}", ",\"extra\":1}").as_bytes()).is_err());
-    assert!(parse_service_update_manifest(valid.replace("\"sequence\":1", "\"sequence\":1,\"sequence\":1").as_bytes()).is_err());
+    assert!(parse_service_update_manifest(
+        valid
+            .replace("\"sequence\":1", "\"sequence\":1,\"sequence\":1")
+            .as_bytes()
+    )
+    .is_err());
 }
 
 #[test]
 fn corrupt_state_and_binary_link_are_rejected_without_mutation() {
     let root = tempfile::tempdir().unwrap();
     let key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
-    let pem = key.to_public_key().to_public_key_pem(Default::default()).unwrap();
+    let pem = key
+        .to_public_key()
+        .to_public_key_pem(Default::default())
+        .unwrap();
     let ring = TrustedKeyring::from_pinned_pem(vec![("update-publisher".into(), pem)]).unwrap();
     let state = root.path().join("service-update-state");
     let (bin, man, sig) = signed_fixture(root.path(), &key, 1, b"safe executable");
