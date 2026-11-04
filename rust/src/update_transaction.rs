@@ -212,11 +212,13 @@ fn record_pending_update(
         .to_str()
         .context("Non-UTF8 candidate path not supported by pending record")?;
     let record = serde_json::json!({
-        "schema": "turkuazav.service-update-pending.v1",
+        "schema": "turkuazav.service-update-pending.v2",
         "sequence": verified.sequence(),
         "manifestSha256": hex::encode(verified.manifest_fingerprint()),
         "previousBinary": previous,
         "candidateBinary": candidate,
+        "candidateSize": verified.verified_binary().len() as u64,
+        "candidateSha256": hex::encode(Sha256::digest(verified.verified_binary())),
     })
     .to_string();
     ensure!(
@@ -258,12 +260,23 @@ fn clear_pending_update(install_root: &Path) -> Result<()> {
 /// Diagnostic report only. Even a matching 40-byte record is NOT proof that
 /// the service is running, healthy, or safe to restore; the pending latch must
 /// never be cleared automatically from this result.
+/// Compares staged bytes with a locally recorded digest, not with a trusted
+/// publisher signature. Never treat a matching digest as authorization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PendingCandidateInspection {
+    LegacyRecordWithoutDigest,
+    Missing,
+    MatchesRecordedDigest,
+    DiffersFromRecordedDigest,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PendingUpdateInspection {
     NoPending,
     NeedsManualReview {
         sequence: i64,
         version_record_matches_marker: bool,
+        candidate_integrity: PendingCandidateInspection,
     },
 }
 
@@ -278,6 +291,10 @@ struct PendingUpdateRecord {
     previous_binary: String,
     #[serde(rename = "candidateBinary")]
     candidate_binary: String,
+    #[serde(rename = "candidateSize")]
+    candidate_size: Option<u64>,
+    #[serde(rename = "candidateSha256")]
+    candidate_sha256: Option<String>,
 }
 
 fn safe_report_path(path: &Path) -> bool {
@@ -327,8 +344,7 @@ pub fn inspect_pending_service_update(
     let previous = Path::new(&record.previous_binary);
     let candidate = Path::new(&record.candidate_binary);
     ensure!(
-        record.schema == "turkuazav.service-update-pending.v1"
-            && record.sequence > 0
+        record.sequence > 0
             && record.manifest_sha256.len() == 64
             && record
                 .manifest_sha256
@@ -337,10 +353,75 @@ pub fn inspect_pending_service_update(
             && safe_report_path(previous)
             && safe_report_path(candidate)
             && previous != candidate
-            && candidate.parent() == Some(install_root),
+            && candidate == candidate_path(install_root, record.sequence),
         "Invalid pending update record fields"
     );
     let fingerprint = hex::decode(&record.manifest_sha256)?;
+
+    // @dev-id TAV-UPDATE-PENDING-030
+    // @purpose Versioned on-disk digest evidence for interrupted staging.
+    // @reason Existing v1 markers must remain readable but cannot claim to
+    // prove candidate integrity; newly written v2 records bind size and hash.
+    let expected_candidate = match record.schema.as_str() {
+        "turkuazav.service-update-pending.v1" => {
+            ensure!(
+                record.candidate_size.is_none() && record.candidate_sha256.is_none(),
+                "Unexpected legacy pending digest fields"
+            );
+            None
+        }
+        "turkuazav.service-update-pending.v2" => {
+            let size = record.candidate_size.context("Missing pending candidate size")?;
+            let digest = record
+                .candidate_sha256
+                .as_deref()
+                .context("Missing pending candidate digest")?;
+            ensure!(
+                size > 0
+                    && size <= MAX_SERVICE_BINARY_BYTES as u64
+                    && digest.len() == 64
+                    && digest
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+                "Invalid pending candidate digest or size"
+            );
+            Some((size, hex::decode(digest)?))
+        }
+        _ => bail!("Unsupported pending update record schema"),
+    };
+
+    // These are diagnostic comparisons only; journal contents are not signed.
+    // The exact versioned path is derived above, never used for execution.
+    let candidate_integrity = match expected_candidate {
+        None => PendingCandidateInspection::LegacyRecordWithoutDigest,
+        Some((expected_size, digest)) => match fs::symlink_metadata(candidate) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                PendingCandidateInspection::Missing
+            }
+            Err(error) => return Err(error).context("Cannot inspect pending candidate"),
+            Ok(meta) => {
+                ensure!(
+                    meta.is_file()
+                        && !is_reparse_or_symlink(&meta)
+                        && meta.len() <= MAX_SERVICE_BINARY_BYTES as u64,
+                    "Unsafe pending candidate"
+                );
+                if meta.len() != expected_size {
+                    PendingCandidateInspection::DiffersFromRecordedDigest
+                } else {
+                    let bytes = read_bounded(candidate, MAX_SERVICE_BINARY_BYTES)?;
+                    let actual = Sha256::digest(&bytes);
+                    if bytes.len() as u64 == expected_size
+                        && actual.as_slice().ct_eq(&digest).unwrap_u8() == 1
+                    {
+                        PendingCandidateInspection::MatchesRecordedDigest
+                    } else {
+                        PendingCandidateInspection::DiffersFromRecordedDigest
+                    }
+                }
+            }
+        },
+    };
 
     // Compare only the persisted 40-byte record; the marker's claimed paths
     // are never opened or used as service activation / rollback authority.
@@ -363,6 +444,7 @@ pub fn inspect_pending_service_update(
     Ok(PendingUpdateInspection::NeedsManualReview {
         sequence: record.sequence,
         version_record_matches_marker: matches_record,
+        candidate_integrity,
     })
 }
 

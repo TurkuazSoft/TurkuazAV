@@ -345,6 +345,7 @@ fn pending_inspection_is_read_only_and_rejects_unresolved_reentry() {
         turkuazav::PendingUpdateInspection::NeedsManualReview {
             sequence: 7,
             version_record_matches_marker: false,
+            candidate_integrity: turkuazav::PendingCandidateInspection::MatchesRecordedDigest,
         }
     );
     assert_eq!(fs::read(&marker).unwrap(), before);
@@ -372,6 +373,7 @@ fn accepted_record_match_still_requires_manual_reconciliation() {
         turkuazav::PendingUpdateInspection::NeedsManualReview {
             sequence: 7,
             version_record_matches_marker: true,
+            candidate_integrity: turkuazav::PendingCandidateInspection::MatchesRecordedDigest,
         }
     );
     assert!(f.run(&mut adapter).is_err());
@@ -390,7 +392,7 @@ fn pending_inspection_rejects_invalid_schema_paths_and_links() {
         "sequence": 7,
         "manifestSha256": hex::encode(f.verified.manifest_fingerprint()),
         "previousBinary": f.old.to_string_lossy(),
-        "candidateBinary": f.temp.path().join("candidate").to_string_lossy(),
+        "candidateBinary": f.temp.path().join(if cfg!(windows) { "turkuazav-service-seq-7.exe" } else { "turkuazav-service-seq-7" }).to_string_lossy(),
     });
     let mut bad_path = valid.clone();
     bad_path["candidateBinary"] = serde_json::json!("../relative");
@@ -464,4 +466,113 @@ fn traversal_state_paths_fail_without_service_switch() {
     assert_eq!(adapter.activated, 0);
     assert_eq!(adapter.restored, 0);
     assert!(!f.state.exists());
+}
+
+#[test]
+fn interrupted_v2_candidate_integrity_detects_tampering_and_missing_files() {
+    let f = Fixture::new();
+    let mut adapter = FakeAdapter::new(&f.old);
+    adapter.fail_health = true;
+    adapter.fail_restore = true;
+    assert!(f.run(&mut adapter).is_err());
+    let inspect = || turkuazav::inspect_pending_service_update(f.temp.path(), &f.state);
+    assert_eq!(
+        inspect().unwrap(),
+        turkuazav::PendingUpdateInspection::NeedsManualReview {
+            sequence: 7,
+            version_record_matches_marker: false,
+            candidate_integrity: turkuazav::PendingCandidateInspection::MatchesRecordedDigest,
+        }
+    );
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&adapter.active, fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    fs::write(&adapter.active, b"modified candidate bytes").unwrap();
+    assert_eq!(
+        inspect().unwrap(),
+        turkuazav::PendingUpdateInspection::NeedsManualReview {
+            sequence: 7,
+            version_record_matches_marker: false,
+            candidate_integrity: turkuazav::PendingCandidateInspection::DiffersFromRecordedDigest,
+        }
+    );
+    fs::remove_file(&adapter.active).unwrap();
+    assert_eq!(
+        inspect().unwrap(),
+        turkuazav::PendingUpdateInspection::NeedsManualReview {
+            sequence: 7,
+            version_record_matches_marker: false,
+            candidate_integrity: turkuazav::PendingCandidateInspection::Missing,
+        }
+    );
+    assert!(f.run(&mut adapter).is_err(), "Pending latch stays set");
+    assert_eq!(adapter.activated, 1);
+    assert!(!f.state.exists());
+}
+
+#[test]
+fn legacy_v1_pending_record_reports_no_candidate_digest() {
+    let f = Fixture::new();
+    let marker = f.temp.path().join(".turkuazav-service-update.pending");
+    let candidate = f.temp.path().join(if cfg!(windows) {
+        "turkuazav-service-seq-7.exe"
+    } else {
+        "turkuazav-service-seq-7"
+    });
+    let record = serde_json::json!({
+        "schema": "turkuazav.service-update-pending.v1",
+        "sequence": 7,
+        "manifestSha256": hex::encode(f.verified.manifest_fingerprint()),
+        "previousBinary": f.old.to_string_lossy(),
+        "candidateBinary": candidate.to_string_lossy(),
+    });
+    fs::write(&marker, record.to_string()).unwrap();
+    assert_eq!(
+        turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).unwrap(),
+        turkuazav::PendingUpdateInspection::NeedsManualReview {
+            sequence: 7,
+            version_record_matches_marker: false,
+            candidate_integrity: turkuazav::PendingCandidateInspection::LegacyRecordWithoutDigest,
+        }
+    );
+    assert_eq!(fs::read(&marker).unwrap(), record.to_string().as_bytes());
+}
+
+#[test]
+fn pending_v2_requires_digest_size_and_rejects_linked_candidate() {
+    let f = Fixture::new();
+    let marker = f.temp.path().join(".turkuazav-service-update.pending");
+    let candidate = f.temp.path().join(if cfg!(windows) {
+        "turkuazav-service-seq-7.exe"
+    } else {
+        "turkuazav-service-seq-7"
+    });
+    let mut record = serde_json::json!({
+        "schema": "turkuazav.service-update-pending.v2",
+        "sequence": 7,
+        "manifestSha256": hex::encode(f.verified.manifest_fingerprint()),
+        "previousBinary": f.old.to_string_lossy(),
+        "candidateBinary": candidate.to_string_lossy(),
+        "candidateSize": 20,
+        "candidateSha256": hex::encode(Sha256::digest(b"trusted update bytes")),
+    });
+    record.as_object_mut().unwrap().remove("candidateSha256");
+    fs::write(&marker, record.to_string()).unwrap();
+    assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
+    record["candidateSha256"] = serde_json::json!(hex::encode(Sha256::digest(b"trusted update bytes")));
+    record["candidateSize"] = serde_json::json!(0);
+    fs::write(&marker, record.to_string()).unwrap();
+    assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        record["candidateSize"] = serde_json::json!(20);
+        fs::write(&marker, record.to_string()).unwrap();
+        symlink(&f.old, &candidate).unwrap();
+        assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
+    }
 }
