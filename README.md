@@ -76,6 +76,7 @@ CI: `.github/workflows/rust-ci.yml` on Windows 2022 and Ubuntu 24.04 includes lo
 - Windows: `TurkuazAV-0.3.1-RUST-UNSIGNED-LOCAL-TEST-win-x64.zip`
 - Linux: `TurkuazAV-0.3.1-RUST-UNSIGNED-LOCAL-TEST-linux-x64.tar.gz`
 - Each archive also has an archive-level `.sha256` sidecar. CI extracts the archive, verifies all payload checksums **and runs the unpacked Rust CLI, service host and desktop headless scan worker** against a known SHA-256 sample from a relocated Unicode working directory. See `tools/package-rust-preview.ps1`. The GUI's `--headless-self-test` does not render a window or establish successful interactive use.
+- Both packages now include the UTF-8 Turkish end-user `TEST_KILAVUZU_TR.md` with extraction steps, a portable headless self-test command and an interactive acceptance checklist. Its SHA-256 is validated after archive extraction.
 - Both packages are **unsigned CI test artifacts only**, not installers or published production releases. Linux GUI requires compatible system display/graphics dependencies.
 
 A successful CI build does **not** prove interactive GUI behavior on end-user machines; file picker, clipboard and cancellation still require real Windows/Linux manual smoke tests.

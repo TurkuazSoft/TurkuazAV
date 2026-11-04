@@ -45,7 +45,7 @@ if (Test-Path -LiteralPath $archive) {
 }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
-$payload = @("turkuazav$extension", "turkuazav-desktop$extension", "turkuazav-service$extension", 'README.md', 'SECURITY.md')
+$payload = @("turkuazav$extension", "turkuazav-desktop$extension", "turkuazav-service$extension", 'README.md', 'SECURITY.md', 'TEST_KILAVUZU_TR.md')
 if ($IsLinux) { $payload += @('turkuazav-preview.service', 'preview.env.example') }
 foreach ($filename in $payload) {
     $source = if ($filename -ceq 'turkuazav-preview.service') {
