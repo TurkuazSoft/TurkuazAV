@@ -257,9 +257,6 @@ fn clear_pending_update(install_root: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Diagnostic report only. Even a matching 40-byte record is NOT proof that
-/// the service is running, healthy, or safe to restore; the pending latch must
-/// never be cleared automatically from this result.
 /// Compares staged bytes with a locally recorded digest, not with a trusted
 /// publisher signature. Never treat a matching digest as authorization.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -270,6 +267,9 @@ pub enum PendingCandidateInspection {
     DiffersFromRecordedDigest,
 }
 
+/// Diagnostic report only. Even a matching 40-byte record is NOT proof that
+/// the service is running, healthy, or safe to restore; the pending latch must
+/// never be cleared automatically from this result.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PendingUpdateInspection {
     NoPending,
@@ -299,9 +299,12 @@ struct PendingUpdateRecord {
 
 fn safe_report_path(path: &Path) -> bool {
     path.is_absolute()
-        && !path
-            .components()
-            .any(|part| matches!(part, std::path::Component::CurDir | std::path::Component::ParentDir))
+        && !path.components().any(|part| {
+            matches!(
+                part,
+                std::path::Component::CurDir | std::path::Component::ParentDir
+            )
+        })
 }
 
 /// @dev-id TAV-UPDATE-PENDING-020
@@ -314,12 +317,10 @@ pub fn inspect_pending_service_update(
     install_root: &Path,
     state_file: &Path,
 ) -> Result<PendingUpdateInspection> {
-    let root_meta = fs::symlink_metadata(install_root)
-        .context("Cannot inspect update installation root")?;
+    let root_meta =
+        fs::symlink_metadata(install_root).context("Cannot inspect update installation root")?;
     ensure!(
-        safe_report_path(install_root)
-            && root_meta.is_dir()
-            && !is_reparse_or_symlink(&root_meta),
+        safe_report_path(install_root) && root_meta.is_dir() && !is_reparse_or_symlink(&root_meta),
         "Unsafe update installation root"
     );
     check_state_path(install_root, state_file)?;
@@ -371,7 +372,9 @@ pub fn inspect_pending_service_update(
             None
         }
         "turkuazav.service-update-pending.v2" => {
-            let size = record.candidate_size.context("Missing pending candidate size")?;
+            let size = record
+                .candidate_size
+                .context("Missing pending candidate size")?;
             let digest = record
                 .candidate_sha256
                 .as_deref()
@@ -437,8 +440,7 @@ pub fn inspect_pending_service_update(
             ensure!(bytes.len() == 40, "Corrupt version state");
             let saved_sequence = i64::from_le_bytes(bytes[..8].try_into()?);
             ensure!(saved_sequence > 0, "Corrupt version sequence");
-            saved_sequence == record.sequence
-                && bytes[8..].ct_eq(&fingerprint).unwrap_u8() == 1
+            saved_sequence == record.sequence && bytes[8..].ct_eq(&fingerprint).unwrap_u8() == 1
         }
     };
     Ok(PendingUpdateInspection::NeedsManualReview {

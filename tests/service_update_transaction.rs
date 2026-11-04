@@ -434,19 +434,18 @@ fn reserved_update_state_paths_fail_before_activation() {
         let mut adapter = FakeAdapter::new(&f.old);
         let forbidden = f.temp.path().join(name);
         assert!(
-            apply_verified_service_update(
-                f.temp.path(),
-                &forbidden,
-                &f.verified,
-                &mut adapter,
-            )
-            .is_err(),
+            apply_verified_service_update(f.temp.path(), &forbidden, &f.verified, &mut adapter,)
+                .is_err(),
             "Reserved or colliding state path must be rejected"
         );
         assert_eq!(adapter.activated, 0);
         assert_eq!(adapter.restored, 0);
         assert_eq!(adapter.active, f.old);
-        assert!(!f.temp.path().join(format!("turkuazav-service-seq-7{suffix}")).exists());
+        assert!(!f
+            .temp
+            .path()
+            .join(format!("turkuazav-service-seq-7{suffix}"))
+            .exists());
     }
     assert!(!f.state.exists());
 }
@@ -455,14 +454,16 @@ fn reserved_update_state_paths_fail_before_activation() {
 fn traversal_state_paths_fail_without_service_switch() {
     let f = Fixture::new();
     let mut adapter = FakeAdapter::new(&f.old);
-    let traversing = f.temp.path().join("subdir").join("..").join("version-state");
-    assert!(apply_verified_service_update(
-        f.temp.path(),
-        &traversing,
-        &f.verified,
-        &mut adapter,
-    )
-    .is_err());
+    let traversing = f
+        .temp
+        .path()
+        .join("subdir")
+        .join("..")
+        .join("version-state");
+    assert!(
+        apply_verified_service_update(f.temp.path(), &traversing, &f.verified, &mut adapter,)
+            .is_err()
+    );
     assert_eq!(adapter.activated, 0);
     assert_eq!(adapter.restored, 0);
     assert!(!f.state.exists());
@@ -538,7 +539,10 @@ fn legacy_v1_pending_record_reports_no_candidate_digest() {
             candidate_integrity: turkuazav::PendingCandidateInspection::LegacyRecordWithoutDigest,
         }
     );
-    assert_eq!(fs::read(&marker).unwrap(), record.to_string().as_bytes());
+    assert_eq!(
+        fs::read(&marker).unwrap(),
+        record.to_string().as_bytes()
+    );
 }
 
 #[test]
@@ -562,7 +566,8 @@ fn pending_v2_requires_digest_size_and_rejects_linked_candidate() {
     record.as_object_mut().unwrap().remove("candidateSha256");
     fs::write(&marker, record.to_string()).unwrap();
     assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
-    record["candidateSha256"] = serde_json::json!(hex::encode(Sha256::digest(b"trusted update bytes")));
+    record["candidateSha256"] =
+        serde_json::json!(hex::encode(Sha256::digest(b"trusted update bytes")));
     record["candidateSize"] = serde_json::json!(0);
     fs::write(&marker, record.to_string()).unwrap();
     assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
