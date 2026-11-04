@@ -429,6 +429,7 @@ fn reserved_update_state_paths_fail_before_activation() {
         ".turkuazav-service-update.txn".to_string(),
         ".turkuazav-update-remainder".to_string(),
         format!("turkuazav-service-seq-7{suffix}"),
+        format!("turkuazav-service-seq-8{suffix}"),
     ];
     for name in disallowed {
         let mut adapter = FakeAdapter::new(&f.old);
@@ -580,4 +581,23 @@ fn pending_v2_requires_digest_size_and_rejects_linked_candidate() {
         symlink(&f.old, &candidate).unwrap();
         assert!(turkuazav::inspect_pending_service_update(f.temp.path(), &f.state).is_err());
     }
+}
+
+#[test]
+fn current_service_binary_cannot_be_used_as_version_state() {
+    let f = Fixture::new();
+    turkuazav::accept_version(&f.state, 1, &[0x11; 32]).unwrap();
+    let before = fs::read(&f.state).unwrap();
+    let mut adapter = FakeAdapter::new(&f.state);
+    let error = f.run(&mut adapter).unwrap_err();
+    assert!(error.to_string().contains("existing service executable"));
+    assert_eq!(adapter.activated, 0);
+    assert_eq!(adapter.restored, 0);
+    assert_eq!(fs::read(&f.state).unwrap(), before);
+    let suffix = if cfg!(windows) { ".exe" } else { "" };
+    assert!(!f
+        .temp
+        .path()
+        .join(format!("turkuazav-service-seq-7{suffix}"))
+        .exists());
 }

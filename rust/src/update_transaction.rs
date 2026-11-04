@@ -102,7 +102,8 @@ fn check_state_path(install_root: &Path, state_file: &Path) -> Result<()> {
         state_name != PENDING_MARKER
             && state_name != TRANSACTION_LOCK
             && state_name != ".turkuazav-service-update.txn"
-            && !state_name.starts_with(".turkuazav-update-"),
+            && !state_name.starts_with(".turkuazav-update-")
+            && !state_name.starts_with("turkuazav-service-seq-"),
         "Reserved service update state path"
     );
     let state_parent = state_file
@@ -479,6 +480,10 @@ pub fn apply_verified_service_update(
         .current_binary()
         .context("Cannot identify prior service")?;
     regular_file(&previous)?;
+    ensure!(
+        state_file != previous,
+        "Update state path collides with existing service executable"
+    );
     let candidate = stage_verified(install_root, verified)?;
     // Record the pending switch before calling any platform activation hook.
     // If journal creation fails, no service activation has been attempted.
