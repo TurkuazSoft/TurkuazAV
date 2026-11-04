@@ -163,7 +163,6 @@ fn stage_verified(install_root: &Path, verified: &VerifiedServiceUpdate) -> Resu
     Ok(target)
 }
 
-
 /// An unresolved marker is a fail-closed latch, NOT a recovery instruction.
 /// Never auto-restore a binary by interpreting untrusted on-disk path strings.
 fn refuse_unresolved_update(install_root: &Path) -> Result<()> {
@@ -292,8 +291,9 @@ pub fn apply_verified_service_update(
         verified.manifest_fingerprint(),
     )
     .context("Service accepted but version commit is uncertain; manual recovery required")?;
-    clear_pending_update(install_root)
-        .context("Service version accepted but pending record cleanup failed; manual recovery required")?;
+    clear_pending_update(install_root).context(
+        "Service version accepted but pending record cleanup failed; manual recovery required",
+    )?;
     Ok(CommittedServiceUpdate {
         sequence: verified.sequence(),
         version: verified.version().to_owned(),

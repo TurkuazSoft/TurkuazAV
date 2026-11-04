@@ -163,7 +163,11 @@ fn healthy_staged_snapshot_is_committed_only_after_acceptance() {
     assert_eq!(adapter.active, result.installed_binary);
     assert_eq!(adapter.activated, 1);
     assert_eq!(adapter.restored, 0);
-    assert!(!f.temp.path().join(".turkuazav-service-update.pending").exists());
+    assert!(!f
+        .temp
+        .path()
+        .join(".turkuazav-service-update.pending")
+        .exists());
     let saved = fs::read(&f.state).unwrap();
     assert_eq!(saved.len(), 40);
     assert_eq!(i64::from_le_bytes(saved[..8].try_into().unwrap()), 7);
@@ -180,7 +184,11 @@ fn failed_activation_restores_old_binary_and_preserves_state() {
     assert_eq!(adapter.active, f.old);
     assert_eq!(adapter.restored, 1);
     assert!(!f.state.exists());
-    assert!(!f.temp.path().join(".turkuazav-service-update.pending").exists());
+    assert!(!f
+        .temp
+        .path()
+        .join(".turkuazav-service-update.pending")
+        .exists());
     assert_eq!(
         fs::read_dir(f.temp.path())
             .unwrap()
@@ -218,7 +226,11 @@ fn failed_restore_keeps_candidate_for_manual_recovery() {
         adapter.active.exists(),
         "Unrecovered candidate must remain available"
     );
-    assert!(f.temp.path().join(".turkuazav-service-update.pending").exists());
+    assert!(f
+        .temp
+        .path()
+        .join(".turkuazav-service-update.pending")
+        .exists());
 }
 
 #[test]
@@ -230,7 +242,11 @@ fn version_commit_conflict_does_not_trigger_unsafe_downgrade() {
     assert!(err.to_string().contains("manual recovery"));
     assert_eq!(adapter.restored, 0);
     assert_ne!(adapter.active, f.old);
-    assert!(f.temp.path().join(".turkuazav-service-update.pending").exists());
+    assert!(f
+        .temp
+        .path()
+        .join(".turkuazav-service-update.pending")
+        .exists());
     let saved = fs::read(&f.state).unwrap();
     assert_eq!(i64::from_le_bytes(saved[..8].try_into().unwrap()), 8);
 }
@@ -302,6 +318,10 @@ fn failure_to_activate_clears_pending_marker_only_after_restore() {
     adapter.fail_health = true;
     assert!(f.run(&mut adapter).is_err());
     assert_eq!(adapter.active, f.old);
-    assert!(!f.temp.path().join(".turkuazav-service-update.pending").exists());
+    assert!(!f
+        .temp
+        .path()
+        .join(".turkuazav-service-update.pending")
+        .exists());
     assert!(!f.state.exists());
 }
