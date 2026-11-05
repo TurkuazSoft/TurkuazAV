@@ -18,7 +18,10 @@ use std::{
     },
     thread,
 };
-use turkuazav::{scan_path_each, FileScanResult, ScanStatus};
+use turkuazav::{
+    scan_path_each, AnalysisCoverage, FileScanResult, ScanStatus, ThreatAssessment, ThreatCategory,
+    ThreatVerdict,
+};
 
 const HISTORY_LIMIT: usize = 20;
 const COMPACT_NAVIGATION_WIDTH: f32 = 720.0;
@@ -447,11 +450,22 @@ impl DesktopApp {
     fn report_card(&mut self, ui: &mut egui::Ui) {
         ui.heading("Son analiz raporu");
         if let Some(report) = &self.report {
-            ui.label(format!(
-                "Durum: {:?} {}",
-                report.status,
-                report.details.as_deref().unwrap_or("")
-            ));
+            // @dev-id TAV-DESKTOP-THREAT-001
+            // @purpose Surface typed scan coverage, not an invented clean verdict.
+            // @contract Only a valid hash result is displayed/copied as SHA-256;
+            // malware category and verdict remain explicitly unevaluated.
+            let assessment = ThreatAssessment::from_hash_scan(report);
+            let coverage = match assessment.coverage {
+                AnalysisCoverage::Completed => "SHA-256 hesaplandı",
+                AnalysisCoverage::Skipped => "Dosya atlandı",
+                AnalysisCoverage::Failed => "SHA-256 başarısız",
+            };
+            ui.label(format!("İşlem kapsamı: {coverage}"));
+            ui.colored_label(WARNING, "Tehdit değerlendirmesi: Yapılmadı");
+            ui.label("Tehdit kategorisi: Belirlenmedi");
+            if let Some(details) = report.details.as_deref() {
+                ui.label(format!("İşlem ayrıntısı: {details}"));
+            }
             ui.label(format!(
                 "Dosya boyutu: {}",
                 report
@@ -459,7 +473,7 @@ impl DesktopApp {
                     .map(|n| format!("{n} bayt"))
                     .unwrap_or_else(|| "-".into())
             ));
-            if let Some(digest) = &report.sha256 {
+            if let Some(digest) = &assessment.sha256 {
                 ui.label(egui::RichText::new(digest).monospace());
                 if ui.button("SHA-256 kopyala").clicked() {
                     if arboard::Clipboard::new()
@@ -688,9 +702,13 @@ fn run_headless_self_test() -> std::io::Result<()> {
     let expected = "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD";
     let correct = app.progress.counts() == (1, 0, 0)
         && app.report.as_ref().is_some_and(|report| {
+            let assessment = ThreatAssessment::from_hash_scan(report);
             report.status == ScanStatus::Hashed
                 && report.size_bytes == Some(3)
-                && report.sha256.as_deref() == Some(expected)
+                && assessment.coverage == AnalysisCoverage::Completed
+                && assessment.verdict == ThreatVerdict::NotEvaluated
+                && assessment.category == ThreatCategory::Unknown
+                && assessment.sha256.as_deref() == Some(expected)
         })
         && app.status.contains("1 işlendi");
     if !correct {
@@ -790,6 +808,37 @@ mod tests {
         assert_eq!(app.history.len(), HISTORY_LIMIT);
         assert!(app.report.is_some());
         assert!(app.status.contains("30 işlendi"));
+    }
+
+    #[test]
+    fn desktop_hash_assessment_rejects_invalid_or_failed_digests() {
+        let sample = PathBuf::from("ui-test-only.txt");
+        for (status, digest, expected_coverage) in [
+            (ScanStatus::Hashed, Some("wrong"), AnalysisCoverage::Failed),
+            (
+                ScanStatus::Skipped,
+                Some("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"),
+                AnalysisCoverage::Skipped,
+            ),
+            (
+                ScanStatus::Failed,
+                Some("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"),
+                AnalysisCoverage::Failed,
+            ),
+        ] {
+            let report = FileScanResult {
+                path: sample.clone(),
+                status,
+                sha256: digest.map(str::to_owned),
+                size_bytes: Some(3),
+                details: None,
+            };
+            let assessment = ThreatAssessment::from_hash_scan(&report);
+            assert_eq!(assessment.coverage, expected_coverage);
+            assert_eq!(assessment.verdict, ThreatVerdict::NotEvaluated);
+            assert_eq!(assessment.category, ThreatCategory::Unknown);
+            assert!(assessment.sha256.is_none(), "invalid or failed hashes are not displayable");
+        }
     }
 
     #[test]
