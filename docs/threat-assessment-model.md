@@ -27,6 +27,24 @@ guessed from the rule identifier. This adapter does not assert that rules came
 from a trusted package: that must be verified by the caller's existing signed
 rule flow before its result can be trusted.
 
+## Product scanner adapters
+
+`rust/src/scanner.rs` adds a small `ScannerBackend` trait and a
+`ScannerReport` wrapper with an engine ID. `Sha256Scanner` delegates to the
+existing bounded hash implementation and never assigns a malware verdict.
+`TrustedYaraXScanner` delegates **only** to the existing
+`scan_trusted_rules_with_cancel` trust chain, which checks signed rule
+packages and the pinned executable; the developer-only YARA-X path is not
+used. It produces review evidence, not a blocking decision.
+
+A cancellation before or after adapter execution returns an error and no
+`ScannerReport`. The report serializes the engine ID and assessment only;
+file paths, raw rule payloads, engine paths and publisher secrets are absent.
+The original scan, CLI and GUI APIs stay unchanged. No automatic multiengine
+correlation is attempted, and no new persistent state schema is introduced.
+The YARA-X component retains its vendor name; **Scanner** names the
+product-level abstraction.
+
 ## Contracts and boundaries
 
 - `AnalysisCoverage`: `completed`, `skipped`, `failed`.
@@ -60,6 +78,8 @@ A future external engine adapter must be independently reviewed for license,
 process isolation, update authenticity, Windows support, and false positives.
 
 ## Verification
+
+Automatic tests in `rust/src/scanner.rs` verify scanner labels, read-only hash reports, cancellation and trusted YARA-X fail-closed behavior.
 
 Automatic tests in `rust/src/threat.rs` check that hash-only results never
 claim malware safety, failures discard digests, YARA matches do not assign
