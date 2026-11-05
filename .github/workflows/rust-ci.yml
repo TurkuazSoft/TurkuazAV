@@ -79,6 +79,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # Catch PowerShell syntax errors before spending CI minutes compiling the GUI.
+      - name: Parse Windows preview setup scripts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($path in @('tools/TurkuazAV-Preview-Setup.ps1', 'tools/test-rust-preview-install-ci.ps1', 'tools/package-rust-preview.ps1')) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path -LiteralPath $path).Path,
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -ne 0) {
+              throw "PowerShell syntax check failed: $path - $($parseErrors[0].Message)"
+            }
+          }
+          Write-Host 'RUST_PREVIEW_POWERSHELL_PARSE=PASS'
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
