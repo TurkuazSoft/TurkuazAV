@@ -18,6 +18,25 @@ Bagimli Oldugu Katman: Documentation | Tool
 4. Asıl uygulama ZIP'ini ayrı bir test klasörüne açın; **`turkuazav-desktop.exe`** dosyasını normal kullanıcı olarak çalıştırın. Yönetici yetkisi gerekmez. Kurulum veya kaldırma yapılmaz: test klasörünü silebilirsiniz.
 5. **Dosya seç** veya **Klasör seç**, ardından **SHA-256 tara** seçeneğine basın. Ekrandaki özet bir dosyanın temiz olduğunu kanıtlamaz.
 
+## İsteğe bağlı kullanıcı kurulumu (Windows x64)
+
+Taşınabilir kullanım için kurulum gerekmez. İsterseniz asıl ZIP arşivini açtığınız klasörde `TurkuazAV-Preview-Setup.ps1` dosyasıyla **mevcut Windows kullanıcısı için** test kurulumu yapabilirsiniz. PowerShell betik çalıştırma ilkeleri buna izin vermelidir; güvenlik ilkesini bütün sistem için kapatmayın.
+
+```powershell
+pwsh -NoProfile -File .\TurkuazAV-Preview-Setup.ps1 -Action Verify
+pwsh -NoProfile -File .\TurkuazAV-Preview-Setup.ps1 -Action Install
+```
+
+Kurulum `$env:LOCALAPPDATA\Programs\TurkuazAV-Preview` klasörüne yapılır, Başlat Menüsüne **TurkuazAV Preview** kısayolu eklenir. Bu yalnızca **imzasız test kurulumudur**; antivirüs servisi kaydetmez, yönetici yetkisi istemez, diğer kullanıcıları etkilemez ve Windows Uygulamalar listesine kayıt yapmaz. Var olan kurulum üzerine yazılmaz.
+
+Kaldırmak için kurulan betiği çalıştırın:
+
+```powershell
+pwsh -NoProfile -File "$env:LOCALAPPDATA\Programs\TurkuazAV-Preview\TurkuazAV-Preview-Setup.ps1" -Action Uninstall
+```
+
+Kaldırıcı yalnızca kendi tanımlı dosyalarını temizler; tanımadığı/kullanıcıya ait dosyaları korur. Kaldırmadan önce masaüstü uygulamasını kapatın. Bu akış Windows CI'da geçici dizinle sınanır; gerçek bilgisayarda kısayol ve arayüz kabulü ayrıca gereklidir.
+
 İsteğe bağlı başsız kontrol (PowerShell, uygulamanın açıldığı klasörde):
 
 ```powershell
@@ -45,4 +64,4 @@ Linux x64 artifact'ını ve içindeki `.tar.gz` arşivini açın. Masaüstü otu
 
 CI, Windows/Linux'ta ikilileri derleyip paketi açarak başsız testleri çalıştırır. **Bu liste gerçek bir kullanıcı oturumunda ayrıca test edilmelidir.** Testte sorun olursa PR #10 üzerine işletim sistemi, commit SHA'sı, hata metni ve mümkünse gizli bilgi içermeyen ekran görüntüsü ekleyin. Özel dosya yolları ve hassas dosyaları paylaşmayın.
 
-Bu Rust test paketi otomatik üretim güncellemesi değildir. Kurulum, gerçek zamanlı koruma ve zararlı yazılım temizleme özellikleri henüz sunulmamaktadır.
+Bu Rust test paketi otomatik üretim güncellemesi değildir. Yalnızca isteğe bağlı kullanıcı kurulumu vardır; korumalı sistem servisi kurulumu, üretim imzası, gerçek zamanlı koruma ve zararlı yazılım temizleme özellikleri sunulmamaktadır.

@@ -102,6 +102,11 @@ jobs:
       - name: Package and verify native preview
         shell: pwsh
         run: ./tools/package-rust-preview.ps1
+      # CI fixture uses an isolated temp root; no end-user paths or shortcuts.
+      - name: Windows preview setup install/uninstall acceptance (trusted CI)
+        if: runner.os == 'Windows' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        shell: pwsh
+        run: ./tools/test-rust-preview-install-ci.ps1
       - name: Upload unsigned Windows GUI test artifact
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4

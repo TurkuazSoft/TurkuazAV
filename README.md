@@ -82,6 +82,8 @@ CI: `.github/workflows/rust-ci.yml` on Windows 2022 and Ubuntu 24.04 includes lo
 - Both packages now include the UTF-8 Turkish end-user `TEST_KILAVUZU_TR.md` with extraction steps, a portable headless self-test command and an interactive acceptance checklist. Its SHA-256 is validated after archive extraction.
 - Both packages are **unsigned CI test artifacts only**, not installers or published production releases. Linux GUI requires compatible system display/graphics dependencies.
 
+The Windows x64 archive additionally includes `TurkuazAV-Preview-Setup.ps1` for **opt-in, current-user-only preview installation and uninstallation**. It checks every extracted file against `SHA256SUMS`, stages a fresh installation under the user's LocalApplicationData and creates a Start Menu shortcut. No overwrite, elevation, service registration, scheduled task, driver, registry integration or automatic protection is enabled. The installed script uninstalls only its own known files, preserving unknown/user-owned files. Windows trusted hosted CI tests installation, installed desktop headless scan, tamper rejection, reinstall refusal and safe removal in an isolated temp fixture. This script and archive are **unsigned**; SHA-256 does not authenticate the publisher. See the [Turkish test guide](TEST_KILAVUZU_TR.md).
+
 A successful CI build does **not** prove interactive GUI behavior on end-user machines; file picker, clipboard and cancellation still require real Windows/Linux manual smoke tests.
 
 ## Signed service-update verification gate (library only)

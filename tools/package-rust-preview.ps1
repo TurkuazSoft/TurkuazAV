@@ -46,12 +46,15 @@ if (Test-Path -LiteralPath $archive) {
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
 $payload = @("turkuazav$extension", "turkuazav-desktop$extension", "turkuazav-service$extension", 'README.md', 'SECURITY.md', 'TEST_KILAVUZU_TR.md')
+if ($IsWindows) { $payload += 'TurkuazAV-Preview-Setup.ps1' }
 if ($IsLinux) { $payload += @('turkuazav-preview.service', 'preview.env.example') }
 foreach ($filename in $payload) {
     $source = if ($filename -ceq 'turkuazav-preview.service') {
         Join-Path $root 'deploy/service/turkuazav-preview.service'
     } elseif ($filename -ceq 'preview.env.example') {
         Join-Path $root 'deploy/service/preview.env.example'
+    } elseif ($filename -ceq 'TurkuazAV-Preview-Setup.ps1') {
+        Join-Path $root 'tools/TurkuazAV-Preview-Setup.ps1'
     } elseif ($filename -like "*$extension" -and $filename -match '^turkuazav') {
         Join-Path $root "target/release/$filename"
     } else {
