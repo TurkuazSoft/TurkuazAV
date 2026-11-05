@@ -106,5 +106,4 @@ mod tests {
         .is_err());
         assert!(!root.join("state").exists());
     }
-
 }

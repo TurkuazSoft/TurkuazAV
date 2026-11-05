@@ -19,8 +19,8 @@ use std::{
     thread,
 };
 use turkuazav::{
-    scan_path_each, AnalysisCoverage, DesktopTrustedRules, FileScanResult, ScanStatus, ScannerReport,
-    ThreatAssessment, ThreatCategory, ThreatVerdict,
+    scan_path_each, AnalysisCoverage, DesktopTrustedRules, FileScanResult, ScanStatus,
+    ScannerReport, ThreatAssessment, ThreatCategory, ThreatVerdict,
 };
 
 const HISTORY_LIMIT: usize = 20;
@@ -37,18 +37,15 @@ fn load_desktop_trusted_rules() -> Option<Arc<DesktopTrustedRules>> {
     if PINNED_DESKTOP_PUBLISHERS.is_empty() {
         return None;
     }
-    let root = dirs::data_local_dir()?.join("TurkuazAV").join("trusted-rules");
+    let root = dirs::data_local_dir()?
+        .join("TurkuazAV")
+        .join("trusted-rules");
     let state = root.join("state.bin");
     let executable = std::env::current_exe().ok()?;
     let engine = executable.with_file_name(if cfg!(windows) { "yr.exe" } else { "yr" });
-    DesktopTrustedRules::from_trusted_bootstrap(
-        PINNED_DESKTOP_PUBLISHERS,
-        &root,
-        &engine,
-        &state,
-    )
-    .ok()
-    .map(Arc::new)
+    DesktopTrustedRules::from_trusted_bootstrap(PINNED_DESKTOP_PUBLISHERS, &root, &engine, &state)
+        .ok()
+        .map(Arc::new)
 }
 
 #[derive(Default)]
@@ -517,8 +514,7 @@ impl DesktopApp {
                     self.trusted_rules.is_some()
                         && !self.busy
                         && self.selected.as_ref().is_some_and(|path| path.is_file()),
-                    egui::Button::new("İmzalı YARA-X analizi")
-                        .min_size(egui::vec2(185.0, 44.0)),
+                    egui::Button::new("İmzalı YARA-X analizi").min_size(egui::vec2(185.0, 44.0)),
                 )
                 .clicked()
             {
@@ -628,10 +624,7 @@ impl DesktopApp {
     fn trusted_report_card(&self, ui: &mut egui::Ui) {
         ui.heading("İmzalı YARA-X kanıt raporu");
         if let Some(report) = &self.rule_report {
-            ui.label(format!(
-                "Motor: {}",
-                report.scanner.display_name()
-            ));
+            ui.label(format!("Motor: {}", report.scanner.display_name()));
             ui.label("İşlem kapsamı: Kural taraması tamamlandı");
             match report.assessment.verdict {
                 ThreatVerdict::RequiresReview => {
@@ -642,7 +635,10 @@ impl DesktopApp {
                 }
             }
             ui.label("Tehdit kategorisi: Belirlenmedi");
-            ui.label(format!("Eşleşen kural sayısı: {}", report.assessment.evidence.len()));
+            ui.label(format!(
+                "Eşleşen kural sayısı: {}",
+                report.assessment.evidence.len()
+            ));
             for evidence in report.assessment.evidence.iter().take(32) {
                 let label: String = evidence.identifier.chars().take(80).collect();
                 ui.monospace(label);
@@ -1050,7 +1046,9 @@ mod tests {
                 }],
             },
         };
-        sender.send(WorkerOutcome::TrustedRules(Ok(report))).unwrap();
+        sender
+            .send(WorkerOutcome::TrustedRules(Ok(report)))
+            .unwrap();
         let mut app = DesktopApp {
             busy: true,
             rule_mode: true,
@@ -1067,7 +1065,10 @@ mod tests {
         assert_eq!(evidence.assessment.verdict, ThreatVerdict::RequiresReview);
         assert_eq!(evidence.assessment.category, ThreatCategory::Unknown);
         assert!(evidence.assessment.sha256.is_none());
-        assert_eq!(evidence.assessment.evidence[0].identifier, "SignedRuleFixture");
+        assert_eq!(
+            evidence.assessment.evidence[0].identifier,
+            "SignedRuleFixture"
+        );
     }
 
     #[test]
@@ -1083,7 +1084,9 @@ mod tests {
                 evidence: Vec::new(),
             },
         };
-        sender.send(WorkerOutcome::TrustedRules(Ok(report))).unwrap();
+        sender
+            .send(WorkerOutcome::TrustedRules(Ok(report)))
+            .unwrap();
         let mut app = DesktopApp {
             busy: true,
             rule_mode: true,

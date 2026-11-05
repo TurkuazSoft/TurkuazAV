@@ -102,7 +102,8 @@ fn real_yarax_signed_and_trusted_regressions() {
     assert!(scan_rules(&positive, &rules, &signature, &pem_file, &fake_engine).is_err());
 
     // Production library API must pin publisher identity independently from a CLI argument.
-    let ring = TrustedKeyring::from_pinned_pem(vec![("trusted-a".to_owned(), pem.clone())]).unwrap();
+    let ring =
+        TrustedKeyring::from_pinned_pem(vec![("trusted-a".to_owned(), pem.clone())]).unwrap();
     let state = temp.path().join("state");
     let (rules, manifest, signature) = write_package(temp.path(), &private, 1, RULE);
     let scan = |path: &Path, yr: &Path| {
@@ -139,13 +140,9 @@ fn real_yarax_signed_and_trusted_regressions() {
 
     // Missing or untrusted publisher material must never be read from
     // a rule package or accepted as a user-selected PEM.
-    assert!(DesktopTrustedRules::from_trusted_bootstrap(
-        &[],
-        temp.path(),
-        &engine,
-        &state
-    )
-    .is_err());
+    assert!(
+        DesktopTrustedRules::from_trusted_bootstrap(&[], temp.path(), &engine, &state).is_err()
+    );
 
     // Different signed content cannot reuse an accepted sequence.
     write_package(temp.path(), &private, 1, OTHER_RULE);
