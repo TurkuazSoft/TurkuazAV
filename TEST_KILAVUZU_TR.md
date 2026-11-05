@@ -27,7 +27,7 @@ pwsh -NoProfile -File .\TurkuazAV-Preview-Setup.ps1 -Action Verify
 pwsh -NoProfile -File .\TurkuazAV-Preview-Setup.ps1 -Action Install
 ```
 
-Kurulum `$env:LOCALAPPDATA\Programs\TurkuazAV-Preview` klasörüne yapılır, Başlat Menüsüne **TurkuazAV Preview** kısayolu eklenir. Bu yalnızca **imzasız test kurulumudur**; antivirüs servisi kaydetmez, yönetici yetkisi istemez, diğer kullanıcıları etkilemez ve Windows Uygulamalar listesine kayıt yapmaz. Var olan kurulum üzerine yazılmaz.
+Kurulum `$env:LOCALAPPDATA\Programs\TurkuazAV-Preview` klasörüne yapılır, Başlat Menüsüne **TurkuazAV Preview** kısayolu eklenir. Bu yalnızca **imzasız test kurulumudur**; antivirüs servisi kaydetmez, yönetici yetkisi istemez, diğer kullanıcıları etkilemez ve Windows Uygulamalar listesine kayıt yapmaz. Kurulum klasörü zaten varsa betik yolu gösterip **açık onay** ister. Yalnızca `EVET` yazarsanız eski klasörün tamamını Windows **Geri Dönüşüm Kutusu'na taşıma** işlemini başlatır; önce yeni dosyaları doğrular ve hazırlar, ardından yeni klasörü oluşturur. `EVET` dışında bir yanıt verirseniz mevcut kurulum korunur. Taşıma başarısız olursa kurulum durur, doğrudan kalıcı silme yapılmaz. Kurulum daha sonra hata verirse önceki klasörü Geri Dönüşüm Kutusu'nda arayabilirsiniz. **Geri alma kesin değildir**: Windows ayarları, dolu/devre dışı kutu veya otomatik temizleme nedeniyle dosyalar erişilemeyebilir. Önemli dosyaları ayrıca yedekleyin; başlamadan önce uygulamayı kapatın.
 
 Kaldırmak için kurulan betiği çalıştırın:
 
