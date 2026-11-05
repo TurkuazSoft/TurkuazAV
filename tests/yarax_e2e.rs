@@ -247,7 +247,7 @@ fn real_yarax_signed_and_trusted_regressions() {
     assert_eq!(fs::read(published.rules()).unwrap(), active_rules);
     assert_eq!(
         fs::read(published.directory().join("CANDIDATE_READY")).unwrap(),
-        b"uncommitted-candidate-only\\n"
+        b"uncommitted-candidate-only\n"
     );
     assert_eq!(fs::read(&state).unwrap(), version_before_candidate);
     let version_dir = published.directory().to_path_buf();
