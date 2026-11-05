@@ -1109,6 +1109,72 @@ mod tests {
     }
 
     #[test]
+    fn missing_publisher_disables_bundle_preflight() {
+        let mut app = DesktopApp::default();
+        assert!(app.trusted_rules.is_none());
+        app.start_bundle_preflight();
+        assert!(!app.busy);
+        assert!(!app.preflight_ready);
+        assert!(app.incoming.is_none());
+        assert!(app.status.contains("henüz yapılandırılmadı"));
+    }
+
+    #[test]
+    fn trusted_preflight_reply_enables_review_only_scan_gate() {
+        let (sender, receiver) = mpsc::channel();
+        sender
+            .send(WorkerOutcome::Preflight(Ok(DesktopRulePreflight {
+                publisher_key_id: "trusted-a".into(),
+                sequence: 17,
+            })))
+            .unwrap();
+        let mut app = DesktopApp {
+            busy: true,
+            rule_mode: true,
+            incoming: Some(receiver),
+            ..DesktopApp::default()
+        };
+        app.poll();
+        assert!(!app.busy);
+        assert!(app.preflight_ready);
+        assert!(app.rule_report.is_none());
+        assert!(app.report.is_none());
+        assert!(app.status.contains("kural sürümü 17"));
+        // A preflight hint is not a trust bootstrap. The release still has no
+        // publisher root, even if a sender constructs an artificial OK reply.
+        app.start_trusted_rules();
+        assert!(!app.busy);
+        assert!(app.status.contains("henüz yapılandırılmadı"));
+    }
+
+    #[test]
+    fn failed_or_cancelled_preflight_does_not_enable_yarax() {
+        for cancel in [false, true] {
+            let (sender, receiver) = mpsc::channel();
+            sender.send(WorkerOutcome::Preflight(Err(()))).unwrap();
+            let mut app = DesktopApp {
+                busy: true,
+                rule_mode: true,
+                preflight_ready: true,
+                incoming: Some(receiver),
+                ..DesktopApp::default()
+            };
+            if cancel {
+                app.cancel.store(true, Ordering::Relaxed);
+            }
+            app.poll();
+            assert!(!app.busy);
+            assert!(!app.preflight_ready);
+            assert!(app.rule_report.is_none());
+            assert!(app.status.contains(if cancel {
+                "iptal"
+            } else {
+                "başarısız"
+            }));
+        }
+    }
+
+    #[test]
     fn trusted_rule_worker_surfaces_review_evidence_without_clean_claim() {
         let (sender, receiver) = mpsc::channel();
         let report = ScannerReport {
