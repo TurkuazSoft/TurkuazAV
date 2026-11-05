@@ -21,6 +21,7 @@ use std::{
 use turkuazav::trusted::{parse_manifest, signature_payload};
 use turkuazav::{
     scan_rules, scan_rules_with_cancel, scan_trusted_rules, scan_trusted_rules_with_cancel,
+    AnalysisCoverage, DesktopTrustedRules, ScannerId, ThreatCategory, ThreatVerdict,
     TrustedKeyring, TrustedScanPaths,
 };
 
@@ -101,7 +102,7 @@ fn real_yarax_signed_and_trusted_regressions() {
     assert!(scan_rules(&positive, &rules, &signature, &pem_file, &fake_engine).is_err());
 
     // Production library API must pin publisher identity independently from a CLI argument.
-    let ring = TrustedKeyring::from_pinned_pem(vec![("trusted-a".to_owned(), pem)]).unwrap();
+    let ring = TrustedKeyring::from_pinned_pem(vec![("trusted-a".to_owned(), pem.clone())]).unwrap();
     let state = temp.path().join("state");
     let (rules, manifest, signature) = write_package(temp.path(), &private, 1, RULE);
     let scan = |path: &Path, yr: &Path| {
@@ -116,6 +117,35 @@ fn real_yarax_signed_and_trusted_regressions() {
         .rule_identifiers
         .is_empty());
     assert_eq!(fs::read(&state).unwrap().len(), 40);
+
+    // The desktop application uses the SAME signed trusted scan adapter,
+    // never the developer-only scan-rules entry point.
+    let desktop = DesktopTrustedRules::from_trusted_bootstrap(
+        &[("trusted-a", pem.as_str())],
+        temp.path(),
+        &engine,
+        &state,
+    )
+    .unwrap();
+    let report = desktop.scan(&positive, &AtomicBool::new(false)).unwrap();
+    assert_eq!(report.scanner, ScannerId::YaraX);
+    assert_eq!(report.assessment.coverage, AnalysisCoverage::Completed);
+    assert_eq!(report.assessment.verdict, ThreatVerdict::RequiresReview);
+    assert_eq!(report.assessment.category, ThreatCategory::Unknown);
+    assert!(report.assessment.sha256.is_none());
+    assert_eq!(report.assessment.evidence.len(), 1);
+    assert_eq!(report.assessment.evidence[0].identifier, "TurkuazAvTest");
+    assert_eq!(fs::read(&state).unwrap().len(), 40);
+
+    // Missing or untrusted publisher material must never be read from
+    // a rule package or accepted as a user-selected PEM.
+    assert!(DesktopTrustedRules::from_trusted_bootstrap(
+        &[],
+        temp.path(),
+        &engine,
+        &state
+    )
+    .is_err());
 
     // Different signed content cannot reuse an accepted sequence.
     write_package(temp.path(), &private, 1, OTHER_RULE);

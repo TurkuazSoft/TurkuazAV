@@ -6,6 +6,7 @@
 // Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
 pub mod config;
+pub mod desktop_rules;
 pub mod monitor;
 pub mod native_events;
 pub mod rules;
@@ -18,6 +19,7 @@ pub mod update;
 pub mod update_transaction;
 pub mod worker;
 
+pub use desktop_rules::DesktopTrustedRules;
 pub use monitor::{ChangeKind, DirectoryObserver, ObservedChange};
 pub use native_events::{NativeChangeWakeup, WakeReason};
 pub use rules::{
