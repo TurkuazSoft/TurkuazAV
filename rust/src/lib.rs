@@ -16,6 +16,7 @@ pub mod rules;
 pub mod scan;
 pub mod scanner;
 pub mod service;
+pub mod source_evidence;
 pub mod threat;
 pub mod trusted;
 pub mod update;
@@ -36,6 +37,7 @@ pub use scanner::{
     scan_with, ScannerBackend, ScannerId, ScannerReport, Sha256Scanner, TrustedYaraXScanner,
 };
 pub use service::{ReconcileSignal, ScanCoordinator};
+pub use source_evidence::{collect_source_evidence, EvidenceSource, SourceEvidenceReport, SourceObservation, SourceSignal};
 pub use threat::{
     AnalysisCoverage, EvidenceType, ThreatAssessment, ThreatCategory, ThreatEvidence, ThreatVerdict,
 };
