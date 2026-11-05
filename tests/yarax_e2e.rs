@@ -137,6 +137,21 @@ fn real_yarax_signed_and_trusted_regressions() {
     assert_eq!(report.assessment.evidence.len(), 1);
     assert_eq!(report.assessment.evidence[0].identifier, "TurkuazAvTest");
     assert_eq!(fs::read(&state).unwrap().len(), 40);
+    let accepted_state = fs::read(&state).unwrap();
+    let preflight = desktop.preflight().unwrap();
+    assert_eq!(preflight.publisher_key_id, "trusted-a");
+    assert_eq!(preflight.sequence, 1);
+    assert_eq!(fs::read(&state).unwrap(), accepted_state);
+
+    let unknown_publisher = DesktopTrustedRules::from_trusted_bootstrap(
+        &[("different-publisher", pem.as_str())],
+        temp.path(),
+        &engine,
+        &state,
+    )
+    .unwrap();
+    assert!(unknown_publisher.preflight().is_err());
+    assert_eq!(fs::read(&state).unwrap(), accepted_state);
 
     // Missing or untrusted publisher material must never be read from
     // a rule package or accepted as a user-selected PEM.
@@ -146,6 +161,7 @@ fn real_yarax_signed_and_trusted_regressions() {
 
     // Different signed content cannot reuse an accepted sequence.
     write_package(temp.path(), &private, 1, OTHER_RULE);
+    assert!(desktop.preflight().is_err());
     assert!(scan(&positive, &engine).is_err());
     assert_eq!(
         i64::from_le_bytes(fs::read(&state).unwrap()[..8].try_into().unwrap()),
@@ -153,6 +169,10 @@ fn real_yarax_signed_and_trusted_regressions() {
     );
 
     write_package(temp.path(), &private, 2, OTHER_RULE);
+    let approved_next = desktop.preflight().unwrap();
+    assert_eq!(approved_next.sequence, 2);
+    // Advisory preflight never advances the persistent state.
+    assert_eq!(fs::read(&state).unwrap(), accepted_state);
     assert!(scan(&negative, &engine)
         .unwrap()
         .rule_identifiers
@@ -192,6 +212,14 @@ fn real_yarax_signed_and_trusted_regressions() {
 
     // Failed engine check does not advance the accepted sequence.
     write_package(temp.path(), &private, 3, RULE);
+    let wrong_engine = DesktopTrustedRules::from_trusted_bootstrap(
+        &[("trusted-a", pem.as_str())],
+        temp.path(),
+        &fake_engine,
+        &state,
+    )
+    .unwrap();
+    assert!(wrong_engine.preflight().is_err());
     assert!(scan(&positive, &fake_engine).is_err());
     assert_eq!(
         i64::from_le_bytes(fs::read(&state).unwrap()[..8].try_into().unwrap()),
@@ -199,5 +227,6 @@ fn real_yarax_signed_and_trusted_regressions() {
     );
 
     fs::write(&rules, OTHER_RULE).unwrap();
+    assert!(desktop.preflight().is_err());
     assert!(scan(&positive, &engine).is_err());
 }
