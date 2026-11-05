@@ -837,7 +837,10 @@ mod tests {
             assert_eq!(assessment.coverage, expected_coverage);
             assert_eq!(assessment.verdict, ThreatVerdict::NotEvaluated);
             assert_eq!(assessment.category, ThreatCategory::Unknown);
-            assert!(assessment.sha256.is_none(), "invalid or failed hashes are not displayable");
+            assert!(
+                assessment.sha256.is_none(),
+                "invalid or failed hashes are not displayable"
+            );
         }
     }
 
