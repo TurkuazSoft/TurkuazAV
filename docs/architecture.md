@@ -12,7 +12,7 @@ Bagimli Oldugu Katman: Documentation
 - `rust/src/scan.rs`: read-only file enumeration, bounded streaming SHA-256, symlink/reparse handling and cancellation
 - `rust/src/scanner.rs`: product-level ScannerBackend API, SHA-256 adapter and signed YARA-X adapter, cancellation guard and path-free ScannerReport
 - `rust/src/threat.rs`: neutral threat category, coverage, verdict and bounded evidence model; never creates a clean or malware verdict from hash/rule matches
-- `rust/src/source_evidence.rs`: bounded read-only SHA-256 provider evidence contracts; observations never imply clean/malicious status, no network adapter wired by default
+- `rust/src/source_evidence.rs`: bounded local SHA-256 evidence collection and digest/provider-scoped opt-in contract for future remote providers; no network adapter wired by default
 - `rust/src/policy.rs`: pure advisory decisions from ScannerReport; incomplete or inconsistent evidence requests another analysis, never automatic blocking
 - `rust/src/monitor.rs`: bounded read-only SHA-256 directory polling and in-memory delta state
 - `rust/src/native_events.rs`: opt-in Windows recursive change notification / Linux inotify root notification hint adapter; periodic full-tree polling fallback remains authoritative, no daemon or blocking hook
@@ -51,6 +51,34 @@ path-free assessment. It carries no authority to block, quarantine or
 persist files. Only the existing trusted signed-rule path can be used by the
 new YARA-X adapter; the developer-only `scan-rules` CLI is NOT promoted to
 a trusted publisher path.
+
+## Independent source evidence and privacy
+
+The provider evidence contract is separate from the trusted YARA-X scan path.
+By default, \`collect_source_evidence\` rejects every source that declares
+\`SourceLocation::Remote\`. A controller can pass an
+\`ExternalLookupApproval\` only for one exact SHA-256 digest and explicitly
+selected provider IDs. The request is prevalidated before any provider runs,
+so a later denied provider cannot leak a digest after an earlier local lookup.
+
+The approval struct only checks scope: **the caller must first obtain genuine
+user consent**. No UI consent workflow, HTTP adapter, endpoint allowlist,
+credential storage or actual remote provider integration exists yet.
+Adapter classifications must be implemented by trusted application code;
+a dishonest implementation could misdeclare itself local. Raw file contents
+and local paths never enter this API. SHA-256 itself can be sensitive metadata
+when disclosed externally.
+
+Adapters receive a 3-second **cooperative** budget and cancellation token.
+The collector converts a late returned observation or provider error into
+\`Unavailable\`, but cannot interrupt a blocking network call. A future
+transport must independently enforce connection/read/overall timeouts,
+TLS validation, fixed provider endpoints, response-size bounds and disabled
+redirects before remote lookups can be enabled.
+
+\`Signal\`, \`NoSignal\` and \`Unavailable\` remain attributed observations,
+not antivirus verdicts, threat-family assertions or authorization to block
+or quarantine files. The default preview performs no remote lookups.
 
 The policy layer is intentionally read-only: `advise(&ScannerReport)`
 checks the reported engine, scan coverage and evidence consistency.
