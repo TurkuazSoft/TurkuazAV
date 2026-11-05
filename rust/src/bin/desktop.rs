@@ -21,6 +21,7 @@ use std::{
 use turkuazav::{scan_path_each, FileScanResult, ScanStatus};
 
 const HISTORY_LIMIT: usize = 20;
+const COMPACT_NAVIGATION_WIDTH: f32 = 720.0;
 const PREVIEW_WARNING: &str =
     "Deneysel tarayıcı — antivirüs koruması sağlamaz. Yalnızca SHA-256 hesaplar.";
 
@@ -77,6 +78,20 @@ enum Page {
     History,
     Modules,
     Settings,
+}
+
+impl Page {
+    const NAVIGATION: [(Self, &'static str); 5] = [
+        (Self::Overview, "⌂  Genel Bakış"),
+        (Self::Analysis, "▤  Dosya Analizi"),
+        (Self::History, "◷  Geçmiş"),
+        (Self::Modules, "◇  Modüller"),
+        (Self::Settings, "⚙  Ayarlar"),
+    ];
+}
+
+fn compact_navigation(width: f32) -> bool {
+    width < COMPACT_NAVIGATION_WIDTH
 }
 
 impl Default for DesktopApp {
@@ -227,6 +242,21 @@ fn dashboard_card(ui: &mut egui::Ui, title: &str, detail: &str) {
         });
 }
 
+fn metric_card(ui: &mut egui::Ui, title: &str, value: usize, accent: egui::Color32) {
+    egui::Frame::group(ui.style())
+        .inner_margin(egui::Margin::same(14))
+        .show(ui, |ui| {
+            ui.set_min_width(136.0);
+            ui.label(egui::RichText::new(title).size(13.0));
+            ui.label(
+                egui::RichText::new(value.to_string())
+                    .size(27.0)
+                    .strong()
+                    .color(accent),
+            );
+        });
+}
+
 impl DesktopApp {
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("horizon_navigation")
@@ -242,13 +272,7 @@ impl DesktopApp {
                 );
                 ui.label(egui::RichText::new("Horizon • Deneysel").weak().size(12.0));
                 ui.add_space(26.0);
-                for (page, caption) in [
-                    (Page::Overview, "⌂  Genel Bakış"),
-                    (Page::Analysis, "▤  Dosya Analizi"),
-                    (Page::History, "◷  Geçmiş"),
-                    (Page::Modules, "◇  Modüller"),
-                    (Page::Settings, "⚙  Ayarlar"),
-                ] {
+                for (page, caption) in Page::NAVIGATION {
                     let button = egui::Button::new(egui::RichText::new(caption).size(15.0))
                         .min_size(egui::vec2(ui.available_width(), 38.0))
                         .selected(self.page == page);
@@ -261,6 +285,39 @@ impl DesktopApp {
                     ui.label(egui::RichText::new("SHA-256 önizleme").weak().size(11.0));
                 });
             });
+    }
+
+    fn compact_nav(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal_wrapped(|ui| {
+            for (page, caption) in Page::NAVIGATION {
+                if ui
+                    .add(
+                        egui::Button::new(caption)
+                            .selected(self.page == page)
+                            .min_size(egui::vec2(112.0, 36.0)),
+                    )
+                    .clicked()
+                {
+                    self.page = page;
+                }
+            }
+        });
+        ui.separator();
+    }
+
+    fn surface(&self, ui: &egui::Ui) -> egui::Frame {
+        let (fill, outline) = if self.light_theme {
+            (egui::Color32::WHITE, egui::Color32::from_gray(210))
+        } else {
+            (
+                egui::Color32::from_rgb(16, 43, 58),
+                egui::Color32::from_rgb(39, 84, 99),
+            )
+        };
+        egui::Frame::group(ui.style())
+            .fill(fill)
+            .stroke(egui::Stroke::new(1.0, outline))
+            .inner_margin(egui::Margin::same(16))
     }
 
     fn top_bar(&mut self, ctx: &egui::Context) {
@@ -301,13 +358,25 @@ impl DesktopApp {
     fn target_picker(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_wrapped(|ui| {
             if ui
-                .add_enabled(!self.busy, egui::Button::new("Dosya seç").fill(TEAL))
+                .add_enabled(
+                    !self.busy,
+                    egui::Button::new(
+                        egui::RichText::new("Dosya seç")
+                            .color(egui::Color32::from_rgb(5, 24, 32))
+                            .strong(),
+                    )
+                    .fill(TEAL)
+                    .min_size(egui::vec2(120.0, 40.0)),
+                )
                 .clicked()
             {
                 self.pick();
             }
             if ui
-                .add_enabled(!self.busy, egui::Button::new("Klasör seç"))
+                .add_enabled(
+                    !self.busy,
+                    egui::Button::new("Klasör seç").min_size(egui::vec2(120.0, 40.0)),
+                )
                 .clicked()
             {
                 self.pick_folder();
@@ -326,14 +395,23 @@ impl DesktopApp {
             if ui
                 .add_enabled(
                     !self.busy && self.selected.is_some(),
-                    egui::Button::new("SHA-256 analizini başlat").fill(TEAL),
+                    egui::Button::new(
+                        egui::RichText::new("SHA-256 analizini başlat")
+                            .color(egui::Color32::from_rgb(5, 24, 32))
+                            .strong(),
+                    )
+                    .fill(TEAL)
+                    .min_size(egui::vec2(234.0, 44.0)),
                 )
                 .clicked()
             {
                 self.start();
             }
             if ui
-                .add_enabled(self.busy, egui::Button::new("İptal"))
+                .add_enabled(
+                    self.busy,
+                    egui::Button::new("İptal").min_size(egui::vec2(96.0, 44.0)),
+                )
                 .clicked()
             {
                 self.cancel.store(true, Ordering::Relaxed);
@@ -353,10 +431,22 @@ impl DesktopApp {
     fn progress_cards(&self, ui: &mut egui::Ui) {
         let (hashed, skipped, failed) = self.progress.counts();
         ui.horizontal_wrapped(|ui| {
-            dashboard_card(ui, "İşlenen dosya", &hashed.to_string());
-            dashboard_card(ui, "Atlanan dosya", &skipped.to_string());
-            dashboard_card(ui, "Hata", &failed.to_string());
+            metric_card(ui, "İşlenen dosya", hashed, TEAL);
+            metric_card(ui, "Atlanan dosya", skipped, WARNING);
+            metric_card(
+                ui,
+                "Hata",
+                failed,
+                egui::Color32::from_rgb(239, 96, 105),
+            );
         });
+        if self.busy {
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.label("Dosyalar analiz ediliyor...");
+            });
+            ui.small("Toplam dosya sayısı önceden bilinmediği için yüzde gösterilmiyor.");
+        }
     }
 
     fn report_card(&mut self, ui: &mut egui::Ui) {
@@ -421,9 +511,7 @@ impl DesktopApp {
         );
         self.warning_banner(ui);
         ui.add_space(14.0);
-        egui::Frame::group(ui.style())
-            .inner_margin(egui::Margin::same(16))
-            .show(ui, |ui| {
+        self.surface(ui).show(ui, |ui| {
                 ui.heading("Yeni analiz başlat");
                 ui.add_space(8.0);
                 self.target_picker(ui);
@@ -431,13 +519,9 @@ impl DesktopApp {
                 self.progress_cards(ui);
             });
         ui.add_space(14.0);
-        egui::Frame::group(ui.style())
-            .inner_margin(egui::Margin::same(16))
-            .show(ui, |ui| self.report_card(ui));
+        self.surface(ui).show(ui, |ui| self.report_card(ui));
         ui.add_space(12.0);
-        egui::Frame::group(ui.style())
-            .inner_margin(egui::Margin::same(16))
-            .show(ui, |ui| self.history_card(ui));
+        self.surface(ui).show(ui, |ui| self.history_card(ui));
     }
 
     fn modules(&self, ui: &mut egui::Ui) {
@@ -502,14 +586,24 @@ impl eframe::App for DesktopApp {
         ctx.set_visuals(visuals);
 
         self.top_bar(ctx);
-        self.sidebar(ctx);
+        let use_compact_navigation = compact_navigation(ctx.available_rect().width());
+        if !use_compact_navigation {
+            self.sidebar(ctx);
+        }
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
+                if use_compact_navigation {
+                    self.compact_nav(ui);
+                }
                 ui.add_space(12.0);
                 match self.page {
                     Page::Overview => self.overview(ui),
                     Page::Analysis => {
-                        section_title(ui, "Dosya Analizi", "Bir dosya veya klasörün SHA-256 özetini hesaplayın.");
+                        section_title(
+                            ui,
+                            "Dosya Analizi",
+                            "Bir dosya veya klasörün SHA-256 özetini hesaplayın.",
+                        );
                         self.warning_banner(ui);
                         ui.add_space(12.0);
                         self.target_picker(ui);
@@ -526,7 +620,9 @@ impl eframe::App for DesktopApp {
                     Page::Settings => self.settings(ui),
                 }
                 ui.add_space(20.0);
-                ui.small("Gerçek zamanlı koruma, karantina ve tehdit engelleme bu sürümde mevcut değildir.");
+                ui.small(
+                    "Gerçek zamanlı koruma, karantina ve tehdit engelleme bu sürümde mevcut değildir.",
+                );
             });
         });
     }
@@ -630,7 +726,12 @@ fn main() -> eframe::Result<()> {
             "TurkuazAV v{} - Deneysel Dosya Analizi",
             env!("CARGO_PKG_VERSION")
         ),
-        eframe::NativeOptions::default(),
+        eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_inner_size([1120.0, 770.0])
+                .with_min_inner_size([600.0, 480.0]),
+            ..Default::default()
+        },
         Box::new(|_| Ok(Box::new(DesktopApp::default()))),
     )
 }
@@ -638,6 +739,15 @@ fn main() -> eframe::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compact_navigation_keeps_all_pages_available_in_small_windows() {
+        assert!(compact_navigation(600.0));
+        assert!(compact_navigation(COMPACT_NAVIGATION_WIDTH - 1.0));
+        assert!(!compact_navigation(COMPACT_NAVIGATION_WIDTH));
+        assert!(!compact_navigation(1120.0));
+        assert_eq!(Page::NAVIGATION.len(), 5);
+    }
 
     #[test]
     fn headless_self_test_runs_real_desktop_scan_worker() {
