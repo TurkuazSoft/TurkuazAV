@@ -55,9 +55,9 @@ a trusted publisher path.
 ## Independent source evidence and privacy
 
 The provider evidence contract is separate from the trusted YARA-X scan path.
-By default, \`collect_source_evidence\` rejects every source that declares
-\`SourceLocation::Remote\`. A controller can pass an
-\`ExternalLookupApproval\` only for one exact SHA-256 digest and explicitly
+By default, `collect_source_evidence` rejects every source that declares
+`SourceLocation::Remote`. A controller can pass an
+`ExternalLookupApproval` only for one exact SHA-256 digest and explicitly
 selected provider IDs. The request is prevalidated before any provider runs,
 so a later denied provider cannot leak a digest after an earlier local lookup.
 
@@ -71,12 +71,12 @@ when disclosed externally.
 
 Adapters receive a 3-second **cooperative** budget and cancellation token.
 The collector converts a late returned observation or provider error into
-\`Unavailable\`, but cannot interrupt a blocking network call. A future
+`Unavailable`, but cannot interrupt a blocking network call. A future
 transport must independently enforce connection/read/overall timeouts,
 TLS validation, fixed provider endpoints, response-size bounds and disabled
 redirects before remote lookups can be enabled.
 
-\`Signal\`, \`NoSignal\` and \`Unavailable\` remain attributed observations,
+`Signal`, `NoSignal` and `Unavailable` remain attributed observations,
 not antivirus verdicts, threat-family assertions or authorization to block
 or quarantine files. The default preview performs no remote lookups.
 
