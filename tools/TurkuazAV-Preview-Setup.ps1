@@ -228,7 +228,23 @@ function Remove-OwnedShortcut([string]$destination) {
     }
 }
 
-switch ($Action) {
+# A single owner serializes local install/uninstall operations. A staged
+# directory is not considered a committed installation until its final rename.
+$setupMutex = $null
+$mutexHeld = $false
+try {
+    if ($Action -in @('Install', 'Uninstall')) {
+        $setupMutex = [Threading.Mutex]::new($false, 'Local\TurkuazAVPreviewSetup')
+        try {
+            $mutexHeld = $setupMutex.WaitOne([TimeSpan]::FromSeconds(30))
+        } catch [System.Threading.AbandonedMutexException] {
+            $mutexHeld = $true
+        }
+        if (-not $mutexHeld) {
+            throw 'Another preview installation is in progress.'
+        }
+    }
+    switch ($Action) {
     'Verify' {
         Assert-Payload $sourceRoot
         Write-Host 'RUST_PREVIEW_SETUP_VERIFY=PASS'
@@ -332,5 +348,14 @@ switch ($Action) {
             Write-Warning 'Unknown or user-owned files remain in the folder; they were preserved.'
         }
         Write-Host 'RUST_PREVIEW_SETUP_UNINSTALL=PASS'
+    }
+}
+    }
+} finally {
+    if ($mutexHeld) {
+        $setupMutex.ReleaseMutex()
+    }
+    if ($null -ne $setupMutex) {
+        $setupMutex.Dispose()
     }
 }
