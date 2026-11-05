@@ -12,7 +12,7 @@ This v0.3.1 experimental implementation is not a full antivirus. It does not pro
 
 ## Signed rule package contract (v1)
 
-1. Publisher keys are pinned by an independently trusted application bootstrap, never by the untrusted manifest or public-key CLI argument.
+1. Publisher keys are pinned by an independently trusted application bootstrap, never by the untrusted manifest or public-key CLI argument. The desktop now supports a read-only pinned-PEM loader (`rust/src/publisher_bootstrap.rs`) that compares complete local public-key bytes to **application-compiled SHA-256 digests** before RSA key validation. Matching SHA-256 does not independently authenticate the application executable: the pin list must be reviewed and shipped by a separately signed release. Current unsigned test builds have an **empty pin list**, so the YARA-X controls remain disabled. Publisher rotation requires an authenticated new release; files or rule manifests must not add trust anchors. Full filesystem ACL protection and anti-rollback hardening remain incomplete. See `docs/publisher-bootstrap.md`.
 2. Strict manifest fields: `schema`, `sequence` (positive signed 64-bit integer), `keyId`, `rulesSha256` (64 lower-case hex characters).
 3. Canonical RSA-PSS-SHA256 signature input: `TurkuazAV.rule-package.v1\n<sequence>\n<keyId>\n<rulesSha256>\n`.
 4. Verify key ID and RSA key strength (at least 2048-bit), signature and content hash before providing rule bytes to the engine.

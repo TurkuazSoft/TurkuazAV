@@ -38,7 +38,9 @@ pub fn load_pinned_publisher_pems(
     );
     ensure!(
         publishers_dir.is_absolute()
-            && !publishers_dir.components().any(|c| matches!(c, Component::ParentDir)),
+            && !publishers_dir
+                .components()
+                .any(|c| matches!(c, Component::ParentDir)),
         "Publisher directory must be an absolute path without parent traversal"
     );
     let parent_metadata =
@@ -104,7 +106,7 @@ mod tests {
             }];
             assert!(load_pinned_publisher_pems(&p, dir.path()).is_err());
         }
-        let good_shape = "0".repeat(64);
+        let good_shape = hex::encode(Sha256::digest(b"untrusted"));
         let duplicate = [
             PublisherDigestPin {
                 key_id: "publisher",
