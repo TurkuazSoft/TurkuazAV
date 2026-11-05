@@ -12,6 +12,7 @@ Bagimli Oldugu Katman: Documentation
 - `rust/src/scan.rs`: read-only file enumeration, bounded streaming SHA-256, symlink/reparse handling and cancellation
 - `rust/src/scanner.rs`: product-level ScannerBackend API, SHA-256 adapter and signed YARA-X adapter, cancellation guard and path-free ScannerReport
 - `rust/src/threat.rs`: neutral threat category, coverage, verdict and bounded evidence model; never creates a clean or malware verdict from hash/rule matches
+- `rust/src/source_evidence.rs`: bounded read-only SHA-256 provider evidence contracts; observations never imply clean/malicious status, no network adapter wired by default
 - `rust/src/policy.rs`: pure advisory decisions from ScannerReport; incomplete or inconsistent evidence requests another analysis, never automatic blocking
 - `rust/src/monitor.rs`: bounded read-only SHA-256 directory polling and in-memory delta state
 - `rust/src/native_events.rs`: opt-in Windows recursive change notification / Linux inotify root notification hint adapter; periodic full-tree polling fallback remains authoritative, no daemon or blocking hook
