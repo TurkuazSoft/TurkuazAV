@@ -28,7 +28,9 @@ pub use monitor::{ChangeKind, DirectoryObserver, ObservedChange};
 pub use native_events::{NativeChangeWakeup, WakeReason};
 pub use policy::{advise, AdvisoryAction, AdvisoryDecision, AdvisoryReason};
 pub use publisher_bootstrap::PublisherDigestPin;
-pub use rule_publication::{publish_verified_rule_candidate, CandidatePublicationPaths, PublishedRuleCandidate};
+pub use rule_publication::{
+    publish_verified_rule_candidate, CandidatePublicationPaths, PublishedRuleCandidate,
+};
 pub use rule_staging::{stage_signed_rule_candidate, RuleCandidatePaths, StagedRuleCandidate};
 pub use rules::{
     parse_yarax_output, scan_rules, scan_rules_with_cancel, verify_engine, RuleScanResult,

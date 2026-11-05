@@ -6,8 +6,8 @@
 // Bagimli Oldugu Katman: Service | Repository | Tool
 
 use crate::{
-    config, desktop_rules::inspect_version_snapshot, rules, scan,
-    rule_staging::StagedRuleCandidate, trusted, TrustedKeyring,
+    config, desktop_rules::inspect_version_snapshot, rule_staging::StagedRuleCandidate, rules,
+    scan, trusted, TrustedKeyring,
 };
 use anyhow::{ensure, Context, Result};
 #[cfg(unix)]
@@ -77,8 +77,10 @@ fn write_new_component(path: &Path, bytes: &[u8]) -> Result<()> {
         .create_new(true)
         .open(path)
         .context("Cannot reserve new candidate file")?;
-    file.write_all(bytes).context("Cannot write candidate file")?;
-    file.sync_all().context("Cannot synchronize candidate file")?;
+    file.write_all(bytes)
+        .context("Cannot write candidate file")?;
+    file.sync_all()
+        .context("Cannot synchronize candidate file")?;
     Ok(())
 }
 
@@ -141,8 +143,7 @@ pub fn publish_verified_rule_candidate(
         trusted_keys,
     )?;
     ensure!(
-        source.sequence == staged.sequence
-            && source.publisher_key_id == staged.publisher_key_id,
+        source.sequence == staged.sequence && source.publisher_key_id == staged.publisher_key_id,
         "Staged candidate identity changed"
     );
     inspect_version_snapshot(
@@ -159,7 +160,8 @@ pub fn publish_verified_rule_candidate(
     let destination = paths.repository_root.join(name);
     // create_dir fails if the name already exists (file, directory or link).
     // Do NOT use rename: Unix rename may overwrite an existing empty directory.
-    fs::create_dir(&destination).context("Candidate version already exists or cannot be reserved")?;
+    fs::create_dir(&destination)
+        .context("Candidate version already exists or cannot be reserved")?;
 
     // After reserving, copy exactly the bounded inputs and re-verify the
     // published snapshot before creating a completion hint. Never reuse

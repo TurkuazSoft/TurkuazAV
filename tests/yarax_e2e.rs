@@ -20,11 +20,10 @@ use std::{
 };
 use turkuazav::trusted::{parse_manifest, signature_payload};
 use turkuazav::{
-    scan_rules, scan_rules_with_cancel, scan_trusted_rules, scan_trusted_rules_with_cancel,
-    publish_verified_rule_candidate, stage_signed_rule_candidate, verify_package,
-    AnalysisCoverage, CandidatePublicationPaths, DesktopTrustedRules, PublisherDigestPin,
-    RuleCandidatePaths, ScannerId, ThreatCategory, ThreatVerdict,
-    TrustedKeyring, TrustedScanPaths,
+    publish_verified_rule_candidate, scan_rules, scan_rules_with_cancel, scan_trusted_rules,
+    scan_trusted_rules_with_cancel, stage_signed_rule_candidate, verify_package, AnalysisCoverage,
+    CandidatePublicationPaths, DesktopTrustedRules, PublisherDigestPin, RuleCandidatePaths,
+    ScannerId, ThreatCategory, ThreatVerdict, TrustedKeyring, TrustedScanPaths,
 };
 
 const RULE: &str =
@@ -263,7 +262,10 @@ fn real_yarax_signed_and_trusted_regressions() {
         },
     )
     .is_err());
-    assert_eq!(fs::read(version_dir.join("rules.yar")).unwrap(), active_rules);
+    assert_eq!(
+        fs::read(version_dir.join("rules.yar")).unwrap(),
+        active_rules
+    );
     assert_eq!(fs::read_dir(&versions_root).unwrap().count(), 1);
 
     // Tampered staged bytes cannot be re-published; READY does not confer
@@ -281,7 +283,11 @@ fn real_yarax_signed_and_trusted_regressions() {
     .is_err());
     assert_eq!(fs::read_dir(&versions_root).unwrap().count(), 1);
     fs::write(candidate.rules(), &active_rules).unwrap();
-    fs::write(version_dir.join("rules.yar"), b"untrusted retained replacement").unwrap();
+    fs::write(
+        version_dir.join("rules.yar"),
+        b"untrusted retained replacement",
+    )
+    .unwrap();
     assert!(verify_package(
         &version_dir.join("rules.yar"),
         &version_dir.join("manifest.json"),
