@@ -19,14 +19,37 @@ use std::{
     thread,
 };
 use turkuazav::{
-    scan_path_each, AnalysisCoverage, FileScanResult, ScanStatus, ThreatAssessment, ThreatCategory,
-    ThreatVerdict,
+    scan_path_each, AnalysisCoverage, DesktopTrustedRules, FileScanResult, ScanStatus, ScannerReport,
+    ThreatAssessment, ThreatCategory, ThreatVerdict,
 };
 
 const HISTORY_LIMIT: usize = 20;
 const COMPACT_NAVIGATION_WIDTH: f32 = 720.0;
 const PREVIEW_WARNING: &str =
     "Deneysel tarayıcı — antivirüs koruması sağlamaz. Yalnızca SHA-256 hesaplar.";
+// @dev-id TAV-DESKTOP-TRUST-BOOTSTRAP-001
+// @purpose Trust must come from the executable's independently pinned roots.
+// @contract No user-provided PEM, manifest or environment variable is trusted.
+// There is no deployed release publisher root in this preview; YARA-X stays off.
+const PINNED_DESKTOP_PUBLISHERS: &[(&str, &str)] = &[];
+
+fn load_desktop_trusted_rules() -> Option<Arc<DesktopTrustedRules>> {
+    if PINNED_DESKTOP_PUBLISHERS.is_empty() {
+        return None;
+    }
+    let root = dirs::data_local_dir()?.join("TurkuazAV").join("trusted-rules");
+    let state = root.join("state.bin");
+    let executable = std::env::current_exe().ok()?;
+    let engine = executable.with_file_name(if cfg!(windows) { "yr.exe" } else { "yr" });
+    DesktopTrustedRules::from_trusted_bootstrap(
+        PINNED_DESKTOP_PUBLISHERS,
+        &root,
+        &engine,
+        &state,
+    )
+    .ok()
+    .map(Arc::new)
+}
 
 #[derive(Default)]
 struct ScanProgress {
@@ -60,14 +83,22 @@ struct ScanOutcome {
     traversal_error: Option<String>,
 }
 
+enum WorkerOutcome {
+    Hash(ScanOutcome),
+    TrustedRules(Result<ScannerReport, ()>),
+}
+
 struct DesktopApp {
     selected: Option<PathBuf>,
     busy: bool,
     cancel: Arc<AtomicBool>,
-    incoming: Option<Receiver<ScanOutcome>>,
+    incoming: Option<Receiver<WorkerOutcome>>,
     progress: Arc<ScanProgress>,
     status: String,
     report: Option<FileScanResult>,
+    trusted_rules: Option<Arc<DesktopTrustedRules>>,
+    rule_report: Option<ScannerReport>,
+    rule_mode: bool,
     history: VecDeque<String>,
     page: Page,
     light_theme: bool,
@@ -107,6 +138,9 @@ impl Default for DesktopApp {
             progress: Arc::new(ScanProgress::default()),
             status: "Tarama için dosya bekleniyor.".into(),
             report: None,
+            trusted_rules: load_desktop_trusted_rules(),
+            rule_report: None,
+            rule_mode: false,
             history: VecDeque::new(),
             page: Page::Overview,
             light_theme: false,
@@ -118,6 +152,7 @@ impl DesktopApp {
     fn choose(&mut self, path: PathBuf) {
         self.selected = Some(path);
         self.report = None; // Old digest must never survive selecting a new target.
+        self.rule_report = None;
         self.status = "Seçim yapıldı. Taramaya hazır.".into();
     }
 
@@ -147,6 +182,8 @@ impl DesktopApp {
         let (tx, rx) = mpsc::channel();
         self.incoming = Some(rx);
         self.report = None;
+        self.rule_report = None;
+        self.rule_mode = false;
         self.busy = true;
         self.status = "SHA-256 taraması yapılıyor...".into();
         thread::spawn(move || {
@@ -170,11 +207,43 @@ impl DesktopApp {
                 report = Some(result);
                 Ok(())
             });
-            let _ = tx.send(ScanOutcome {
+            let _ = tx.send(WorkerOutcome::Hash(ScanOutcome {
                 report,
                 history,
                 traversal_error: outcome.err().map(|error| error.to_string()),
-            });
+            }));
+        });
+    }
+
+    // @dev-id TAV-DESKTOP-TRUSTED-WORKER-001
+    // @purpose Scan only a single regular file through the signed-rule adapter.
+    // @contract A missing publisher bootstrap never starts an engine. Errors
+    // are redacted from the GUI and diagnostic logs.
+    fn start_trusted_rules(&mut self) {
+        if self.busy {
+            return;
+        }
+        let Some(profile) = self.trusted_rules.as_ref().map(Arc::clone) else {
+            self.status = "Güvenilir YARA-X yayıncısı henüz yapılandırılmadı.".into();
+            return;
+        };
+        let Some(target) = self.selected.clone().filter(|path| path.is_file()) else {
+            self.status = "İmzalı YARA-X analizi için tek bir dosya seçin.".into();
+            return;
+        };
+        self.cancel = Arc::new(AtomicBool::new(false));
+        self.progress = Arc::new(ScanProgress::default());
+        let cancelled = Arc::clone(&self.cancel);
+        let (tx, rx) = mpsc::channel();
+        self.incoming = Some(rx);
+        self.report = None;
+        self.rule_report = None;
+        self.rule_mode = true;
+        self.busy = true;
+        self.status = "İmzalı YARA-X kural paketi doğrulanıyor...".into();
+        thread::spawn(move || {
+            let result = profile.scan(&target, &cancelled).map_err(|_| ());
+            let _ = tx.send(WorkerOutcome::TrustedRules(result));
         });
     }
 
@@ -184,6 +253,7 @@ impl DesktopApp {
             self.busy = false;
             self.incoming = None;
             self.report = None;
+            self.rule_report = None;
             if self.cancel.load(Ordering::Relaxed) {
                 self.status = "Tarama iptal edildi.".into();
             } else {
@@ -192,7 +262,7 @@ impl DesktopApp {
             }
             return;
         }
-        if let Some(Ok(outcome)) = received {
+        if let Some(Ok(WorkerOutcome::Hash(outcome))) = received {
             self.busy = false;
             self.incoming = None;
             if self.cancel.load(Ordering::Relaxed) {
@@ -217,6 +287,34 @@ impl DesktopApp {
                     log_event("SCAN_FAILED", "ScanError");
                 }
                 self.report = outcome.report;
+            }
+        }
+        if let Some(Ok(WorkerOutcome::TrustedRules(result))) = received {
+            self.busy = false;
+            self.incoming = None;
+            if self.cancel.load(Ordering::Relaxed) {
+                self.status = "İmzalı YARA-X analizi iptal edildi.".into();
+                self.rule_report = None;
+            } else {
+                match result {
+                    Ok(report) => {
+                        self.status = match report.assessment.verdict {
+                            ThreatVerdict::RequiresReview => {
+                                "Kural eşleşmesi bulundu. İnceleme gerekli; otomatik engelleme yapılmadı."
+                            }
+                            ThreatVerdict::NotEvaluated => {
+                                "Kural eşleşmesi yok. Dosyanın güvenli olduğu kanıtlanmadı."
+                            }
+                        }
+                        .into();
+                        self.rule_report = Some(report);
+                    }
+                    Err(()) => {
+                        log_event("RULE_SCAN_FAILED", "TrustedScanError");
+                        self.status = "İmzalı kural analizi tamamlanamadı; güvenlik doğrulamasını kontrol edin.".into();
+                        self.rule_report = None;
+                    }
+                }
             }
         }
     }
@@ -412,6 +510,18 @@ impl DesktopApp {
             }
             if ui
                 .add_enabled(
+                    self.trusted_rules.is_some()
+                        && !self.busy
+                        && self.selected.as_ref().is_some_and(|path| path.is_file()),
+                    egui::Button::new("İmzalı YARA-X analizi")
+                        .min_size(egui::vec2(185.0, 44.0)),
+                )
+                .clicked()
+            {
+                self.start_trusted_rules();
+            }
+            if ui
+                .add_enabled(
                     self.busy,
                     egui::Button::new("İptal").min_size(egui::vec2(96.0, 44.0)),
                 )
@@ -424,14 +534,32 @@ impl DesktopApp {
                 ui.spinner();
             }
         });
+        if self.trusted_rules.is_none() {
+            ui.small("İmzalı YARA-X devre dışı: uygulamada güvenilir yayıncı anahtarı henüz yok.");
+        } else {
+            ui.small("İmzalı kural taraması yalnızca tek dosyada çalışır ve temiz hükmü vermez.");
+        }
         ui.add_space(8.0);
         ui.label(&self.status);
         if self.busy {
-            ui.label("Analiz devam ediyor. İşlem sayıları canlı olarak güncellenir.");
+            ui.label(if self.rule_mode {
+                "İmzalı kural ve YARA-X motoru doğrulanıyor; sonuç inceleme amaçlıdır."
+            } else {
+                "Analiz devam ediyor. İşlem sayıları canlı olarak güncellenir."
+            });
         }
     }
 
     fn progress_cards(&self, ui: &mut egui::Ui) {
+        if self.rule_mode {
+            if self.busy {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("YARA-X imzalı kural analizi devam ediyor...");
+                });
+            }
+            return;
+        }
         let (hashed, skipped, failed) = self.progress.counts();
         ui.horizontal_wrapped(|ui| {
             metric_card(ui, "İşlenen dosya", hashed, TEAL);
@@ -493,6 +621,32 @@ impl DesktopApp {
         ui.small("SHA-256 sonucu bir dosyanın güvenli olduğunu kanıtlamaz.");
     }
 
+    fn trusted_report_card(&self, ui: &mut egui::Ui) {
+        ui.heading("İmzalı YARA-X kanıt raporu");
+        if let Some(report) = &self.rule_report {
+            ui.label(format!(
+                "Motor: {}",
+                report.scanner.display_name()
+            ));
+            ui.label("İşlem kapsamı: Kural taraması tamamlandı");
+            match report.assessment.verdict {
+                ThreatVerdict::RequiresReview => {
+                    ui.colored_label(WARNING, "Değerlendirme: İnceleme gerekli");
+                }
+                ThreatVerdict::NotEvaluated => {
+                    ui.colored_label(WARNING, "Değerlendirme: Zararlı yazılım hükmü yok");
+                }
+            }
+            ui.label("Tehdit kategorisi: Belirlenmedi");
+            ui.label(format!("Eşleşen kural sayısı: {}", report.assessment.evidence.len()));
+            for evidence in report.assessment.evidence.iter().take(32) {
+                let label: String = evidence.identifier.chars().take(80).collect();
+                ui.monospace(label);
+            }
+        }
+        ui.small("YARA-X eşleşmesi otomatik zararlı hükmü veya engelleme değildir.");
+    }
+
     fn history_card(&mut self, ui: &mut egui::Ui) {
         ui.heading("Oturum geçmişi");
         ui.label("Son 20 kayıt • Yalnızca bellekte tutulur.");
@@ -528,7 +682,11 @@ impl DesktopApp {
             self.progress_cards(ui);
         });
         ui.add_space(14.0);
-        self.surface(ui).show(ui, |ui| self.report_card(ui));
+        if self.rule_report.is_some() {
+            self.surface(ui).show(ui, |ui| self.trusted_report_card(ui));
+        } else {
+            self.surface(ui).show(ui, |ui| self.report_card(ui));
+        }
         ui.add_space(12.0);
         self.surface(ui).show(ui, |ui| self.history_card(ui));
     }
@@ -559,8 +717,12 @@ impl DesktopApp {
         ui.add_space(8.0);
         dashboard_card(
             ui,
-            "Zararlı yazılım tespiti",
-            "Bu GUI önizlemesinde etkin değil.",
+            "İmzalı YARA-X kural analizi",
+            if self.trusted_rules.is_some() {
+                "Yapılandırıldı • Yalnızca inceleme kanıtı sunar; engelleme yapmaz."
+            } else {
+                "Devre dışı • Güvenilir yayıncı anahtarı uygulamaya eklenmedi."
+            },
         );
     }
 
@@ -571,7 +733,11 @@ impl DesktopApp {
         ui.label(format!("Uygulama sürümü: {}", env!("CARGO_PKG_VERSION")));
         ui.label("Arayüz: TurkuazAV Horizon (deneysel)");
         ui.label("Tarayıcı: TurkuazAV Scanner (SHA-256 önizleme)");
-        ui.label("YARA-X: ayrı imza motoru, bu masaüstü görünümünde etkin değil");
+        ui.label(if self.trusted_rules.is_some() {
+            "YARA-X: sabit yayıncı köküyle imzalı kural analizi hazır (deneysel)"
+        } else {
+            "YARA-X: güvenilir yayıncı kökü henüz sağlanmadı; tarama devre dışı"
+        });
         ui.label("Geçmiş: Yalnızca bellek • en fazla 20 kayıt");
         ui.add_space(12.0);
         self.warning_banner(ui);
@@ -621,7 +787,11 @@ impl eframe::App for DesktopApp {
                         ui.add_space(12.0);
                         self.progress_cards(ui);
                         ui.separator();
-                        self.report_card(ui);
+                        if self.rule_report.is_some() {
+                            self.trusted_report_card(ui);
+                        } else {
+                            self.report_card(ui);
+                        }
                     }
                     Page::History => {
                         section_title(ui, "Geçmiş", "Bu uygulama oturumunda tamamlanan analizler.");
