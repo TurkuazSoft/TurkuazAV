@@ -10,6 +10,7 @@ pub mod monitor;
 pub mod native_events;
 pub mod rules;
 pub mod scan;
+pub mod scanner;
 pub mod service;
 pub mod threat;
 pub mod trusted;
@@ -23,6 +24,9 @@ pub use rules::{
     parse_yarax_output, scan_rules, scan_rules_with_cancel, verify_engine, RuleScanResult,
 };
 pub use scan::{scan_file, scan_path, scan_path_each, FileScanResult, ScanStatus};
+pub use scanner::{
+    scan_with, ScannerBackend, ScannerId, ScannerReport, Sha256Scanner, TrustedYaraXScanner,
+};
 pub use service::{ReconcileSignal, ScanCoordinator};
 pub use threat::{
     AnalysisCoverage, EvidenceType, ThreatAssessment, ThreatCategory, ThreatEvidence, ThreatVerdict,
