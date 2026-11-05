@@ -70,9 +70,10 @@ pub fn advise(report: &ScannerReport) -> AdvisoryDecision {
                 (ThreatVerdict::RequiresReview, false) => {
                     AdvisoryDecision::new(AdvisoryAction::ManualReview, AdvisoryReason::RuleMatch)
                 }
-                (ThreatVerdict::NotEvaluated, true) => {
-                    AdvisoryDecision::new(AdvisoryAction::NoAutomaticAction, AdvisoryReason::NoRuleMatch)
-                }
+                (ThreatVerdict::NotEvaluated, true) => AdvisoryDecision::new(
+                    AdvisoryAction::NoAutomaticAction,
+                    AdvisoryReason::NoRuleMatch,
+                ),
                 _ => AdvisoryDecision::new(
                     AdvisoryAction::RetryAnalysis,
                     AdvisoryReason::InconsistentReport,
@@ -107,10 +108,8 @@ mod tests {
     #[test]
     fn hash_is_never_a_clean_verdict_or_blocking_action() {
         let mut report = example(ScannerId::Sha256, ThreatVerdict::NotEvaluated);
-        report.assessment.sha256 = Some(
-            "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"
-                .to_owned(),
-        );
+        report.assessment.sha256 =
+            Some("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD".to_owned());
         assert_eq!(
             advise(&report),
             AdvisoryDecision::new(AdvisoryAction::NoAutomaticAction, AdvisoryReason::HashOnly)
@@ -122,7 +121,10 @@ mod tests {
         let mut report = example(ScannerId::YaraX, ThreatVerdict::NotEvaluated);
         assert_eq!(
             advise(&report),
-            AdvisoryDecision::new(AdvisoryAction::NoAutomaticAction, AdvisoryReason::NoRuleMatch)
+            AdvisoryDecision::new(
+                AdvisoryAction::NoAutomaticAction,
+                AdvisoryReason::NoRuleMatch
+            )
         );
         report.assessment.verdict = ThreatVerdict::RequiresReview;
         report.assessment.evidence.push(ThreatEvidence {
