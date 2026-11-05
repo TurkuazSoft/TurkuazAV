@@ -20,7 +20,7 @@ use std::{
 };
 use turkuazav::{
     scan_path_each, AnalysisCoverage, DesktopRulePreflight, DesktopTrustedRules, FileScanResult,
-    ScanStatus, ScannerReport, ThreatAssessment, ThreatCategory, ThreatVerdict,
+    PublisherDigestPin, ScanStatus, ScannerReport, ThreatAssessment, ThreatCategory, ThreatVerdict,
 };
 
 const HISTORY_LIMIT: usize = 20;
@@ -30,22 +30,30 @@ const PREVIEW_WARNING: &str =
 // @dev-id TAV-DESKTOP-TRUST-BOOTSTRAP-001
 // @purpose Trust must come from the executable's independently pinned roots.
 // @contract No user-provided PEM, manifest or environment variable is trusted.
-// There is no deployed release publisher root in this preview; YARA-X stays off.
-const PINNED_DESKTOP_PUBLISHERS: &[(&str, &str)] = &[];
+// Only SHA-256 PEM byte pins compiled into a separately signed application can
+// enable publisher roots. Preview ships no independently authorized pins.
+const PINNED_DESKTOP_PUBLISHER_HASHES: &[PublisherDigestPin<'static>] = &[];
 
 fn load_desktop_trusted_rules() -> Option<Arc<DesktopTrustedRules>> {
-    if PINNED_DESKTOP_PUBLISHERS.is_empty() {
+    if PINNED_DESKTOP_PUBLISHER_HASHES.is_empty() {
         return None;
     }
     let root = dirs::data_local_dir()?
         .join("TurkuazAV")
         .join("trusted-rules");
+    let publishers = root.join("publishers");
     let state = root.join("state.bin");
     let executable = std::env::current_exe().ok()?;
     let engine = executable.with_file_name(if cfg!(windows) { "yr.exe" } else { "yr" });
-    DesktopTrustedRules::from_trusted_bootstrap(PINNED_DESKTOP_PUBLISHERS, &root, &engine, &state)
-        .ok()
-        .map(Arc::new)
+    DesktopTrustedRules::from_pinned_digest_directory(
+        PINNED_DESKTOP_PUBLISHER_HASHES,
+        &publishers,
+        &root,
+        &engine,
+        &state,
+    )
+    .ok()
+    .map(Arc::new)
 }
 
 #[derive(Default)]

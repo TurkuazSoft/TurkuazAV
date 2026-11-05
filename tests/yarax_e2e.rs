@@ -21,8 +21,8 @@ use std::{
 use turkuazav::trusted::{parse_manifest, signature_payload};
 use turkuazav::{
     scan_rules, scan_rules_with_cancel, scan_trusted_rules, scan_trusted_rules_with_cancel,
-    AnalysisCoverage, DesktopTrustedRules, ScannerId, ThreatCategory, ThreatVerdict,
-    TrustedKeyring, TrustedScanPaths,
+    AnalysisCoverage, DesktopTrustedRules, PublisherDigestPin, ScannerId, ThreatCategory,
+    ThreatVerdict, TrustedKeyring, TrustedScanPaths,
 };
 
 const RULE: &str =
@@ -142,6 +142,44 @@ fn real_yarax_signed_and_trusted_regressions() {
     assert_eq!(preflight.publisher_key_id, "trusted-a");
     assert_eq!(preflight.sequence, 1);
     assert_eq!(fs::read(&state).unwrap(), accepted_state);
+
+    // Only an independent application digest can authorize the on-disk PEM.
+    let publishers = temp.path().join("publishers");
+    fs::create_dir(&publishers).unwrap();
+    let publisher_file = publishers.join("trusted-a.pem");
+    fs::write(&publisher_file, pem.as_bytes()).unwrap();
+    let expected_pem_sha256 = hex::encode(Sha256::digest(pem.as_bytes()));
+    let pins = [PublisherDigestPin {
+        key_id: "trusted-a",
+        pem_sha256: &expected_pem_sha256,
+    }];
+    let disk_bootstrap = DesktopTrustedRules::from_pinned_digest_directory(
+        &pins,
+        &publishers,
+        temp.path(),
+        &engine,
+        &state,
+    )
+    .unwrap();
+    assert_eq!(disk_bootstrap.preflight().unwrap().sequence, 1);
+    let report = disk_bootstrap
+        .scan(&positive, &AtomicBool::new(false))
+        .unwrap();
+    assert_eq!(report.assessment.verdict, ThreatVerdict::RequiresReview);
+    assert_eq!(report.assessment.evidence[0].identifier, "TurkuazAvTest");
+    assert_eq!(fs::read(&state).unwrap(), accepted_state);
+    // Altered publisher PEM cannot grant trust or change rollback state.
+    fs::write(&publisher_file, b"replaced-public-key").unwrap();
+    assert!(DesktopTrustedRules::from_pinned_digest_directory(
+        &pins,
+        &publishers,
+        temp.path(),
+        &engine,
+        &state,
+    )
+    .is_err());
+    assert_eq!(fs::read(&state).unwrap(), accepted_state);
+    fs::write(&publisher_file, pem.as_bytes()).unwrap();
 
     let unknown_publisher = DesktopTrustedRules::from_trusted_bootstrap(
         &[("different-publisher", pem.as_str())],

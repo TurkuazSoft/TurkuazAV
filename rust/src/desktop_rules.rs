@@ -6,7 +6,9 @@
 // Bagimli Oldugu Katman: Service | Tool | Config
 
 use crate::{
-    config, rules, scan, scan_with, trusted, ScannerReport, TrustedKeyring, TrustedYaraXScanner,
+    config,
+    publisher_bootstrap::{load_pinned_publisher_pems, PublisherDigestPin},
+    rules, scan, scan_with, trusted, ScannerReport, TrustedKeyring, TrustedYaraXScanner,
 };
 use anyhow::{bail, ensure, Context, Result};
 use std::{
@@ -70,6 +72,25 @@ fn inspect_version_snapshot(
 }
 
 impl DesktopTrustedRules {
+    /// @dev-id TAV-DESKTOP-TRUST-013
+    /// @purpose Read publisher PEMs only after byte-for-byte digest pinning.
+    /// @contract Pins must come from the independently authenticated app;
+    /// on-disk PEM material never grants trust by itself.
+    pub fn from_pinned_digest_directory(
+        pins: &[PublisherDigestPin<'_>],
+        publishers_dir: &Path,
+        rules_directory: &Path,
+        engine: &Path,
+        state_file: &Path,
+    ) -> Result<Self> {
+        let owned = load_pinned_publisher_pems(pins, publishers_dir)?;
+        let pinned: Vec<(&str, &str)> = owned
+            .iter()
+            .map(|(id, pem)| (id.as_str(), pem.as_str()))
+            .collect();
+        Self::from_trusted_bootstrap(&pinned, rules_directory, engine, state_file)
+    }
+
     /// Pin provenance is the caller's responsibility: supply only publisher
     /// roots independently provisioned as part of the trusted application.
     /// Empty roots are rejected rather than silently allowing user keys.

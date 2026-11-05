@@ -9,6 +9,7 @@ pub mod config;
 pub mod desktop_rules;
 pub mod monitor;
 pub mod native_events;
+pub mod publisher_bootstrap;
 pub mod rules;
 pub mod scan;
 pub mod scanner;
@@ -22,6 +23,7 @@ pub mod worker;
 pub use desktop_rules::{DesktopRulePreflight, DesktopTrustedRules};
 pub use monitor::{ChangeKind, DirectoryObserver, ObservedChange};
 pub use native_events::{NativeChangeWakeup, WakeReason};
+pub use publisher_bootstrap::PublisherDigestPin;
 pub use rules::{
     parse_yarax_output, scan_rules, scan_rules_with_cancel, verify_engine, RuleScanResult,
 };
