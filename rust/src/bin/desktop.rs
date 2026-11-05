@@ -19,8 +19,8 @@ use std::{
     thread,
 };
 use turkuazav::{
-    scan_path_each, AnalysisCoverage, DesktopTrustedRules, FileScanResult, ScanStatus,
-    ScannerReport, ThreatAssessment, ThreatCategory, ThreatVerdict,
+    scan_path_each, AnalysisCoverage, DesktopRulePreflight, DesktopTrustedRules, FileScanResult,
+    ScanStatus, ScannerReport, ThreatAssessment, ThreatCategory, ThreatVerdict,
 };
 
 const HISTORY_LIMIT: usize = 20;
@@ -83,6 +83,7 @@ struct ScanOutcome {
 enum WorkerOutcome {
     Hash(ScanOutcome),
     TrustedRules(Result<ScannerReport, ()>),
+    Preflight(Result<DesktopRulePreflight, ()>),
 }
 
 struct DesktopApp {
@@ -95,6 +96,7 @@ struct DesktopApp {
     report: Option<FileScanResult>,
     trusted_rules: Option<Arc<DesktopTrustedRules>>,
     rule_report: Option<ScannerReport>,
+    preflight_ready: bool,
     rule_mode: bool,
     history: VecDeque<String>,
     page: Page,
@@ -137,6 +139,7 @@ impl Default for DesktopApp {
             report: None,
             trusted_rules: load_desktop_trusted_rules(),
             rule_report: None,
+            preflight_ready: false,
             rule_mode: false,
             history: VecDeque::new(),
             page: Page::Overview,
@@ -212,6 +215,38 @@ impl DesktopApp {
         });
     }
 
+    // @dev-id TAV-DESKTOP-PREFLIGHT-001
+    // @purpose Verify signed rules and the pinned YARA-X engine on a worker.
+    // @contract This read-only hint cannot advance the 40-byte rollback state
+    // or authorize a later scan without repeating runtime verification.
+    fn start_bundle_preflight(&mut self) {
+        if self.busy {
+            return;
+        }
+        let Some(profile) = self.trusted_rules.as_ref().map(Arc::clone) else {
+            self.status = "Güvenilir YARA-X yayıncısı henüz yapılandırılmadı.".into();
+            return;
+        };
+        self.cancel = Arc::new(AtomicBool::new(false));
+        let cancelled = Arc::clone(&self.cancel);
+        let (tx, rx) = mpsc::channel();
+        self.incoming = Some(rx);
+        self.preflight_ready = false;
+        self.rule_report = None;
+        self.rule_mode = true;
+        self.busy = true;
+        self.status = "İmzalı kural paketi ve YARA-X motoru ön denetleniyor...".into();
+        thread::spawn(move || {
+            // Cancellation prevents publishing the result; engine hashing is
+            // bounded but is not guaranteed to abort in the middle of a read.
+            if cancelled.load(Ordering::Relaxed) {
+                return;
+            }
+            let result = profile.preflight().map_err(|_| ());
+            let _ = tx.send(WorkerOutcome::Preflight(result));
+        });
+    }
+
     // @dev-id TAV-DESKTOP-TRUSTED-WORKER-001
     // @purpose Scan only a single regular file through the signed-rule adapter.
     // @contract A missing publisher bootstrap never starts an engine. Errors
@@ -224,6 +259,10 @@ impl DesktopApp {
             self.status = "Güvenilir YARA-X yayıncısı henüz yapılandırılmadı.".into();
             return;
         };
+        if !self.preflight_ready {
+            self.status = "Önce imzalı paket ön denetimini başarıyla tamamlayın.".into();
+            return;
+        }
         let Some(target) = self.selected.clone().filter(|path| path.is_file()) else {
             self.status = "İmzalı YARA-X analizi için tek bir dosya seçin.".into();
             return;
@@ -255,6 +294,7 @@ impl DesktopApp {
                 self.incoming = None;
                 self.report = None;
                 self.rule_report = None;
+                self.preflight_ready = false;
                 if self.cancel.load(Ordering::Relaxed) {
                     self.status = "Tarama iptal edildi.".into();
                 } else {
@@ -289,6 +329,30 @@ impl DesktopApp {
                     self.report = outcome.report;
                 }
             }
+            Ok(WorkerOutcome::Preflight(result)) => {
+                self.busy = false;
+                self.incoming = None;
+                if self.cancel.load(Ordering::Relaxed) {
+                    self.preflight_ready = false;
+                    self.status = "İmzalı paket ön denetimi iptal edildi.".into();
+                } else {
+                    match result {
+                        Ok(status) => {
+                            self.preflight_ready = true;
+                            self.status = format!(
+                                "Ön denetim geçti: yayıncı {}, kural sürümü {}. Tarama sırasında yeniden doğrulanır.",
+                                status.publisher_key_id, status.sequence
+                            );
+                        }
+                        Err(()) => {
+                            self.preflight_ready = false;
+                            log_event("RULE_PREFLIGHT_FAILED", "TrustedBundleError");
+                            self.status =
+                                "İmzalı paket ön denetimi başarısız; tarama devre dışı.".into();
+                        }
+                    }
+                }
+            }
             Ok(WorkerOutcome::TrustedRules(result)) => {
                 self.busy = false;
                 self.incoming = None;
@@ -310,6 +374,7 @@ impl DesktopApp {
                             self.rule_report = Some(report);
                         }
                         Err(()) => {
+                            self.preflight_ready = false;
                             log_event("RULE_SCAN_FAILED", "TrustedScanError");
                             self.status = "İmzalı kural analizi tamamlanamadı; güvenlik doğrulamasını kontrol edin.".into();
                             self.rule_report = None;
@@ -511,7 +576,18 @@ impl DesktopApp {
             }
             if ui
                 .add_enabled(
-                    self.trusted_rules.is_some()
+                    self.trusted_rules.is_some() && !self.busy,
+                    egui::Button::new("İmzalı paket ön denetimi")
+                        .min_size(egui::vec2(190.0, 44.0)),
+                )
+                .clicked()
+            {
+                self.start_bundle_preflight();
+            }
+            if ui
+                .add_enabled(
+                    self.preflight_ready
+                        && self.trusted_rules.is_some()
                         && !self.busy
                         && self.selected.as_ref().is_some_and(|path| path.is_file()),
                     egui::Button::new("İmzalı YARA-X analizi").min_size(egui::vec2(185.0, 44.0)),
@@ -536,14 +612,16 @@ impl DesktopApp {
         });
         if self.trusted_rules.is_none() {
             ui.small("İmzalı YARA-X devre dışı: uygulamada güvenilir yayıncı anahtarı henüz yok.");
+        } else if self.preflight_ready {
+            ui.small("Ön denetim geçti; canlı tarama imza ve motoru tekrar doğrular. Temiz hükmü verilmez.");
         } else {
-            ui.small("İmzalı kural taraması yalnızca tek dosyada çalışır ve temiz hükmü vermez.");
+            ui.small("İmzalı YARA-X için önce paket ön denetimi gerekiyor. Klasör taraması desteklenmez.");
         }
         ui.add_space(8.0);
         ui.label(&self.status);
         if self.busy {
             ui.label(if self.rule_mode {
-                "İmzalı kural ve YARA-X motoru doğrulanıyor; sonuç inceleme amaçlıdır."
+                "İmzalı kural veya YARA-X motoru doğrulanıyor; sonuç inceleme amaçlıdır."
             } else {
                 "Analiz devam ediyor. İşlem sayıları canlı olarak güncellenir."
             });
