@@ -45,6 +45,30 @@ correlation is attempted, and no new persistent state schema is introduced.
 The YARA-X component retains its vendor name; **Scanner** names the
 product-level abstraction.
 
+## Read-only policy boundary
+
+`rust/src/policy.rs` adds `advise(&ScannerReport)`, a pure decision
+function. It keeps the scanner's technical evidence separate from UI
+advice: a completed SHA-256 hash requires no automatic action, a trusted
+YARA-X rule match requests manual review, and a completed YARA-X scan with
+zero matches **does not prove that a file is clean**. Skipped/failed
+scans and inconsistent reports request a new analysis instead of publishing
+an incorrect result.
+
+For the current 0.3.1 contract the only advisory actions are
+`no_automatic_action`, `manual_review`, and `retry_analysis`.
+The public enums have no file deletion, quarantine, process termination
+or trusted/clean verdict. A `ScannerId` label is attribution metadata
+rather than authentication of a scan origin. Independently pinned
+publisher keys, signed packages and verified engine bytes are mandatory
+for YARA-X trust. Malformed or externally forged scanner reports must
+not be interpreted as such proof.
+
+The desktop's signed YARA-X result flow now consults this shared policy
+for both status text and the evidence card. Inconsistent responses are
+discarded and the user must repeat verification. No SHA-256 or rule
+analysis behavior changes, and there is no persistent policy database.
+
 ## Desktop signed-rule gate
 
 `rust/src/desktop_rules.rs` requires a nonempty, independently pinned RSA publisher bootstrap and absolute rule/engine/state paths. The GUI has no publisher pins in the unsigned preview and does not offer a PEM picker, command-line trust override or automatic rule download. For any future provisioned build, the GUI's YARA-X scan button remains disabled until its asynchronous, read-only preflight succeeds. Cancelled or failed preflight invalidates that readiness, and scanning still repeats all trust checks. The snapshot state check may race another writer; it is explicitly advisory and cannot authorize downgrade acceptance. The worker uses `TrustedYaraXScanner` and the same signed-rule/engine/anti-rollback code, not the developer-only `scan-rules` flow. Successful matches are bounded review evidence; cancelled or failed jobs publish no result. Existing 40-byte state behavior is unchanged. Real publisher provisioning, protected filesystem state, signed distribution and manual Windows UI acceptance are still missing.
@@ -82,6 +106,10 @@ A future external engine adapter must be independently reviewed for license,
 process isolation, update authenticity, Windows support, and false positives.
 
 ## Verification
+
+Automatic tests in `rust/src/policy.rs` cover incomplete scans,
+empty YARA-X matches, valid review evidence, hash-only reports and
+inconsistent engine/coverage/evidence combinations.
 
 Automatic tests in `rust/src/scanner.rs` verify scanner labels, read-only hash reports, cancellation and trusted YARA-X fail-closed behavior.
 
