@@ -9,6 +9,7 @@ pub mod config;
 pub mod desktop_rules;
 pub mod monitor;
 pub mod native_events;
+pub mod policy;
 pub mod publisher_bootstrap;
 pub mod rule_staging;
 pub mod rules;
@@ -24,6 +25,7 @@ pub mod worker;
 pub use desktop_rules::{DesktopRulePreflight, DesktopTrustedRules};
 pub use monitor::{ChangeKind, DirectoryObserver, ObservedChange};
 pub use native_events::{NativeChangeWakeup, WakeReason};
+pub use policy::{advise, AdvisoryAction, AdvisoryDecision, AdvisoryReason};
 pub use publisher_bootstrap::PublisherDigestPin;
 pub use rule_staging::{stage_signed_rule_candidate, RuleCandidatePaths, StagedRuleCandidate};
 pub use rules::{
