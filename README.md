@@ -21,6 +21,8 @@ TurkuazAV is a **read-only experimental file analysis tool**, **not an antivirus
 
 ## Build / run
 
+The active source tree is Rust-only. CI checks tracked files for retired native source projects and older workflows with `tools/assert-rust-only.ps1`. This does not rewrite Git history.
+
 Requires Rust (minimum declared 1.85; CI uses stable).
 
 ```bash

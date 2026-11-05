@@ -31,6 +31,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Enforce Rust-only active source tree
+        shell: pwsh
+        run: ./tools/assert-rust-only.ps1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
