@@ -501,8 +501,8 @@ impl DesktopApp {
     fn overview(&mut self, ui: &mut egui::Ui) {
         section_title(
             ui,
-            "Dosya Analiz Aracı",
-            "SHA-256 hesaplama ve dosya inceleme önizlemesi",
+            "TurkuazAV Scanner",
+            "SHA-256 dosya inceleme önizlemesi • Antivirüs koruması değildir",
         );
         self.warning_banner(ui);
         ui.add_space(14.0);
@@ -556,6 +556,8 @@ impl DesktopApp {
         ui.add_space(10.0);
         ui.label(format!("Uygulama sürümü: {}", env!("CARGO_PKG_VERSION")));
         ui.label("Arayüz: TurkuazAV Horizon (deneysel)");
+        ui.label("Tarayıcı: TurkuazAV Scanner (SHA-256 önizleme)");
+        ui.label("YARA-X: ayrı imza motoru, bu masaüstü görünümünde etkin değil");
         ui.label("Geçmiş: Yalnızca bellek • en fazla 20 kayıt");
         ui.add_space(12.0);
         self.warning_banner(ui);
