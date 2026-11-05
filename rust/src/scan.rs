@@ -134,9 +134,8 @@ pub fn scan_file(path: &Path, cancelled: &AtomicBool) -> FileScanResult {
 }
 
 /// Streams scan results to a caller-owned consumer instead of collecting an
-/// entire directory into memory. This preserves the former .NET CLI's
-/// incremental results contract. Consumer failures and cancellation stop
-/// traversal immediately.
+/// entire directory into memory. Consumers receive incremental results;
+/// failures and cancellation stop traversal immediately.
 pub fn scan_path_each(
     path: &Path,
     cancelled: &AtomicBool,

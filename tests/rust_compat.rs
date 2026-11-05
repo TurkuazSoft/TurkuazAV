@@ -1,5 +1,5 @@
 // Dosya Yolu: REPO_ROOT/tests/rust_compat.rs
-// Amac: Eski 0.3.1 davranis kontrati Rust ile sabit tutulur
+// Amac: Rust tarama ve state sozlesmesi regresyon testleri
 // Modul - FileType: Tests - Rust
 // Version: 0.3.1
 // Aciklama: Hash ve fail-closed regression
@@ -33,16 +33,16 @@ fn malicious_engine_output_path_does_not_masquerade_as_snapshot() {
 }
 
 #[test]
-fn existing_dotnet_40_byte_state_is_accepted_without_format_migration() {
+fn canonical_40_byte_state_supports_same_sequence_and_upgrade() {
     let temp = tempfile::tempdir().unwrap();
-    let state = temp.path().join("legacy-state.bin");
+    let state = temp.path().join("version-state.bin");
     let fingerprint = [0xABu8; 32];
     let mut record = [0u8; 40];
     record[..8].copy_from_slice(&17i64.to_le_bytes());
     record[8..].copy_from_slice(&fingerprint);
     fs::write(&state, record).unwrap();
 
-    // The original .NET little-endian record can be read by Rust unchanged.
+    // The canonical little-endian record must remain readable without rewriting.
     accept_version(&state, 17, &fingerprint).unwrap();
     assert_eq!(fs::read(&state).unwrap(), record);
     assert!(accept_version(&state, 16, &fingerprint).is_err());

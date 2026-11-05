@@ -1,8 +1,8 @@
 // Dosya Yolu: REPO_ROOT/rust/src/config.rs
-// Amac: 0.3.1 CSharp limit ve guven koklerini korur
+// Amac: Rust 0.3.1 guvenlik limitlerini ve sabitlerini tanimlar
 // Modul - FileType: Config - Rust
 // Version: 0.3.1
-// Aciklama: Degerler mevcut v0.3.1 uygulama sozlesmesinden aktarildi
+// Aciklama: Dosya boyutu, kaynak limitleri ve imza alan sabitleri
 // Bagimli Oldugu Katman: Config
 
 pub const MAX_FILE_SIZE: u64 = 104_857_600;

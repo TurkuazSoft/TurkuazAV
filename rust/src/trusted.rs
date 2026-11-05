@@ -2,7 +2,7 @@
 // Amac: Trusted manifest imza/publisher kontrolu ve anti-rollback
 // Modul - FileType: Service - Rust
 // Version: 0.3.1
-// Aciklama: CSharp 0.2.4 imza payload ve 40-byte state formatini korur
+// Aciklama: Rust kanonik imza payload ve 40-byte state sozlesmesi
 // Bagimli Oldugu Katman: Service | Repo | Tool | Config
 
 use crate::{
