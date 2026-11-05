@@ -144,7 +144,10 @@ mod tests {
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("\"sha256\""));
         assert!(!json.contains("benign-fixture.txt"));
-        assert_eq!(serde_json::from_str::<ScannerReport>(&json).unwrap(), result);
+        assert_eq!(
+            serde_json::from_str::<ScannerReport>(&json).unwrap(),
+            result
+        );
     }
 
     #[test]
@@ -170,12 +173,17 @@ mod tests {
     fn yara_x_identity_kept_and_untrusted_rules_not_executed() {
         let temp = tempfile::tempdir().unwrap();
         let ring = TrustedKeyring::from_pinned_pem(Vec::<(String, String)>::new()).unwrap();
+        let rules_path = temp.path().join("missing-rules");
+        let manifest = temp.path().join("missing-manifest");
+        let signature = temp.path().join("missing-signature");
+        let engine = temp.path().join("missing-engine");
+        let state_file = temp.path().join("version-state");
         let scanner = TrustedYaraXScanner {
-            rules_path: &temp.path().join("missing-rules"),
-            manifest: &temp.path().join("missing-manifest"),
-            signature: &temp.path().join("missing-signature"),
-            engine: &temp.path().join("missing-engine"),
-            state_file: &temp.path().join("version-state"),
+            rules_path: &rules_path,
+            manifest: &manifest,
+            signature: &signature,
+            engine: &engine,
+            state_file: &state_file,
             trusted_keys: &ring,
         };
         let target = temp.path().join("not-executed");
