@@ -248,71 +248,75 @@ impl DesktopApp {
     }
 
     fn poll(&mut self) {
-        let received = self.incoming.as_ref().map(|rx| rx.try_recv());
-        if matches!(received, Some(Err(mpsc::TryRecvError::Disconnected))) {
-            self.busy = false;
-            self.incoming = None;
-            self.report = None;
-            self.rule_report = None;
-            if self.cancel.load(Ordering::Relaxed) {
-                self.status = "Tarama iptal edildi.".into();
-            } else {
-                log_event("SCAN_FAILED", "WorkerDisconnected");
-                self.status = "Tarama tamamlanamadı. Yeniden deneyin.".into();
-            }
+        let Some(received) = self.incoming.as_ref().map(|rx| rx.try_recv()) else {
             return;
-        }
-        if let Some(Ok(WorkerOutcome::Hash(outcome))) = received {
-            self.busy = false;
-            self.incoming = None;
-            if self.cancel.load(Ordering::Relaxed) {
-                // Incomplete scans never surface a previous/partial successful hash.
-                self.status = "Tarama iptal edildi.".into();
+        };
+        match received {
+            Err(mpsc::TryRecvError::Empty) => {}
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.busy = false;
+                self.incoming = None;
                 self.report = None;
-            } else if outcome.traversal_error.is_some() {
-                log_event("SCAN_FAILED", "TraversalError");
-                self.status = "Tarama tamamlanamadı. Yeniden deneyin.".into();
-                self.report = None;
-            } else {
-                let (hashed, skipped, failed) = self.progress.counts();
-                self.status = format!(
-                    "Tarama tamamlandı: {} işlendi, {} atlandı, {} hata. Sonuç antivirüs temizliği kanıtı değildir.",
-                    hashed, skipped, failed
-                );
-                for item in outcome.history.into_iter().rev() {
-                    self.history.push_front(item);
-                }
-                self.history.truncate(HISTORY_LIMIT);
-                if failed > 0 {
-                    log_event("SCAN_FAILED", "ScanError");
-                }
-                self.report = outcome.report;
-            }
-        }
-        if let Some(Ok(WorkerOutcome::TrustedRules(result))) = received {
-            self.busy = false;
-            self.incoming = None;
-            if self.cancel.load(Ordering::Relaxed) {
-                self.status = "İmzalı YARA-X analizi iptal edildi.".into();
                 self.rule_report = None;
-            } else {
-                match result {
-                    Ok(report) => {
-                        self.status = match report.assessment.verdict {
-                            ThreatVerdict::RequiresReview => {
-                                "Kural eşleşmesi bulundu. İnceleme gerekli; otomatik engelleme yapılmadı."
-                            }
-                            ThreatVerdict::NotEvaluated => {
-                                "Kural eşleşmesi yok. Dosyanın güvenli olduğu kanıtlanmadı."
-                            }
-                        }
-                        .into();
-                        self.rule_report = Some(report);
+                if self.cancel.load(Ordering::Relaxed) {
+                    self.status = "Tarama iptal edildi.".into();
+                } else {
+                    log_event("SCAN_FAILED", "WorkerDisconnected");
+                    self.status = "Tarama tamamlanamadı. Yeniden deneyin.".into();
+                }
+            }
+            Ok(WorkerOutcome::Hash(outcome)) => {
+                self.busy = false;
+                self.incoming = None;
+                if self.cancel.load(Ordering::Relaxed) {
+                    // Incomplete scans never surface a previous or partial hash.
+                    self.status = "Tarama iptal edildi.".into();
+                    self.report = None;
+                } else if outcome.traversal_error.is_some() {
+                    log_event("SCAN_FAILED", "TraversalError");
+                    self.status = "Tarama tamamlanamadı. Yeniden deneyin.".into();
+                    self.report = None;
+                } else {
+                    let (hashed, skipped, failed) = self.progress.counts();
+                    self.status = format!(
+                        "Tarama tamamlandı: {} işlendi, {} atlandı, {} hata. Sonuç antivirüs temizliği kanıtı değildir.",
+                        hashed, skipped, failed
+                    );
+                    for item in outcome.history.into_iter().rev() {
+                        self.history.push_front(item);
                     }
-                    Err(()) => {
-                        log_event("RULE_SCAN_FAILED", "TrustedScanError");
-                        self.status = "İmzalı kural analizi tamamlanamadı; güvenlik doğrulamasını kontrol edin.".into();
-                        self.rule_report = None;
+                    self.history.truncate(HISTORY_LIMIT);
+                    if failed > 0 {
+                        log_event("SCAN_FAILED", "ScanError");
+                    }
+                    self.report = outcome.report;
+                }
+            }
+            Ok(WorkerOutcome::TrustedRules(result)) => {
+                self.busy = false;
+                self.incoming = None;
+                if self.cancel.load(Ordering::Relaxed) {
+                    self.status = "İmzalı YARA-X analizi iptal edildi.".into();
+                    self.rule_report = None;
+                } else {
+                    match result {
+                        Ok(report) => {
+                            self.status = match report.assessment.verdict {
+                                ThreatVerdict::RequiresReview => {
+                                    "Kural eşleşmesi bulundu. İnceleme gerekli; otomatik engelleme yapılmadı."
+                                }
+                                ThreatVerdict::NotEvaluated => {
+                                    "Kural eşleşmesi yok. Dosyanın güvenli olduğu kanıtlanmadı."
+                                }
+                            }
+                            .into();
+                            self.rule_report = Some(report);
+                        }
+                        Err(()) => {
+                            log_event("RULE_SCAN_FAILED", "TrustedScanError");
+                            self.status = "İmzalı kural analizi tamamlanamadı; güvenlik doğrulamasını kontrol edin.".into();
+                            self.rule_report = None;
+                        }
                     }
                 }
             }
