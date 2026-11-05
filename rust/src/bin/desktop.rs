@@ -433,12 +433,7 @@ impl DesktopApp {
         ui.horizontal_wrapped(|ui| {
             metric_card(ui, "İşlenen dosya", hashed, TEAL);
             metric_card(ui, "Atlanan dosya", skipped, WARNING);
-            metric_card(
-                ui,
-                "Hata",
-                failed,
-                egui::Color32::from_rgb(239, 96, 105),
-            );
+            metric_card(ui, "Hata", failed, egui::Color32::from_rgb(239, 96, 105));
         });
         if self.busy {
             ui.horizontal(|ui| {
@@ -512,12 +507,12 @@ impl DesktopApp {
         self.warning_banner(ui);
         ui.add_space(14.0);
         self.surface(ui).show(ui, |ui| {
-                ui.heading("Yeni analiz başlat");
-                ui.add_space(8.0);
-                self.target_picker(ui);
-                ui.add_space(14.0);
-                self.progress_cards(ui);
-            });
+            ui.heading("Yeni analiz başlat");
+            ui.add_space(8.0);
+            self.target_picker(ui);
+            ui.add_space(14.0);
+            self.progress_cards(ui);
+        });
         ui.add_space(14.0);
         self.surface(ui).show(ui, |ui| self.report_card(ui));
         ui.add_space(12.0);
