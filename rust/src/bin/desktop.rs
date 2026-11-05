@@ -19,8 +19,9 @@ use std::{
     thread,
 };
 use turkuazav::{
-    scan_path_each, AnalysisCoverage, DesktopRulePreflight, DesktopTrustedRules, FileScanResult,
-    PublisherDigestPin, ScanStatus, ScannerReport, ThreatAssessment, ThreatCategory, ThreatVerdict,
+    advise, scan_path_each, AdvisoryReason, AnalysisCoverage, DesktopRulePreflight,
+    DesktopTrustedRules, FileScanResult, PublisherDigestPin, ScanStatus, ScannerReport,
+    ThreatAssessment, ThreatCategory, ThreatVerdict,
 };
 
 const HISTORY_LIMIT: usize = 20;
@@ -370,16 +371,23 @@ impl DesktopApp {
                 } else {
                     match result {
                         Ok(report) => {
-                            self.status = match report.assessment.verdict {
-                                ThreatVerdict::RequiresReview => {
-                                    "Kural eşleşmesi bulundu. İnceleme gerekli; otomatik engelleme yapılmadı."
+                            // The advisory policy is pure: no file deletion or blocking.
+                            match advise(&report).reason {
+                                AdvisoryReason::RuleMatch => {
+                                    self.status = "Kural eşleşmesi bulundu. İnceleme gerekli; otomatik engelleme yapılmadı.".into();
+                                    self.rule_report = Some(report);
                                 }
-                                ThreatVerdict::NotEvaluated => {
-                                    "Kural eşleşmesi yok. Dosyanın güvenli olduğu kanıtlanmadı."
+                                AdvisoryReason::NoRuleMatch => {
+                                    self.status = "Kural eşleşmesi yok. Dosyanın güvenli olduğu kanıtlanmadı.".into();
+                                    self.rule_report = Some(report);
+                                }
+                                _ => {
+                                    self.preflight_ready = false;
+                                    self.rule_report = None;
+                                    log_event("RULE_SCAN_FAILED", "InconsistentReport");
+                                    self.status = "Analiz raporu tutarsız; yeniden doğrulama gerekli.".into();
                                 }
                             }
-                            .into();
-                            self.rule_report = Some(report);
                         }
                         Err(()) => {
                             self.preflight_ready = false;
@@ -711,12 +719,15 @@ impl DesktopApp {
         if let Some(report) = &self.rule_report {
             ui.label(format!("Motor: {}", report.scanner.display_name()));
             ui.label("İşlem kapsamı: Kural taraması tamamlandı");
-            match report.assessment.verdict {
-                ThreatVerdict::RequiresReview => {
+            match advise(report).reason {
+                AdvisoryReason::RuleMatch => {
                     ui.colored_label(WARNING, "Değerlendirme: İnceleme gerekli");
                 }
-                ThreatVerdict::NotEvaluated => {
+                AdvisoryReason::NoRuleMatch => {
                     ui.colored_label(WARNING, "Değerlendirme: Zararlı yazılım hükmü yok");
+                }
+                _ => {
+                    ui.colored_label(WARNING, "Değerlendirme: Yeniden doğrulama gerekli");
                 }
             }
             ui.label("Tehdit kategorisi: Belirlenmedi");
