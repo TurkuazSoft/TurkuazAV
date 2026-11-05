@@ -40,10 +40,14 @@ used. It produces review evidence, not a blocking decision.
 A cancellation before or after adapter execution returns an error and no
 `ScannerReport`. The report serializes the engine ID and assessment only;
 file paths, raw rule payloads, engine paths and publisher secrets are absent.
-The original scan, CLI and GUI APIs stay unchanged. No automatic multiengine
+The CLI and the original hash scan APIs remain unchanged. The desktop now includes a strictly gated signed-rule worker and evidence-only UI; without independently pinned publisher keys the shipped desktop keeps this action disabled. No automatic multiengine
 correlation is attempted, and no new persistent state schema is introduced.
 The YARA-X component retains its vendor name; **Scanner** names the
 product-level abstraction.
+
+## Desktop signed-rule gate
+
+`rust/src/desktop_rules.rs` requires a nonempty, independently pinned RSA publisher bootstrap and absolute rule/engine/state paths. The GUI has no publisher pins in the unsigned preview and does not offer a PEM picker, command-line trust override or automatic rule download. The worker uses `TrustedYaraXScanner` and the same signed-rule/engine/anti-rollback code, not the developer-only `scan-rules` flow. Successful matches are bounded review evidence; cancelled or failed jobs publish no result. Existing 40-byte state behavior is unchanged. Real publisher provisioning, protected filesystem state, signed distribution and manual Windows UI acceptance are still missing.
 
 ## Contracts and boundaries
 

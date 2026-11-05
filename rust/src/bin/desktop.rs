@@ -928,6 +928,7 @@ fn main() -> eframe::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use turkuazav::{EvidenceType, ScannerId, ThreatEvidence};
 
     #[test]
     fn compact_navigation_keeps_all_pages_available_in_small_windows() {
@@ -1016,6 +1017,84 @@ mod tests {
                 "invalid or failed hashes are not displayable"
             );
         }
+    }
+
+    #[test]
+    fn missing_publisher_disables_rule_scan_without_worker_or_state_changes() {
+        let mut app = DesktopApp::default();
+        assert!(app.trusted_rules.is_none());
+        let fixture = tempfile::tempdir().unwrap();
+        let target = fixture.path().join("sample.txt");
+        fs::write(&target, b"abc").unwrap();
+        app.choose(target);
+        app.start_trusted_rules();
+        assert!(!app.busy);
+        assert!(app.incoming.is_none());
+        assert!(app.rule_report.is_none());
+        assert!(app.status.contains("henüz yapılandırılmadı"));
+    }
+
+    #[test]
+    fn trusted_rule_worker_surfaces_review_evidence_without_clean_claim() {
+        let (sender, receiver) = mpsc::channel();
+        let report = ScannerReport {
+            scanner: ScannerId::YaraX,
+            assessment: ThreatAssessment {
+                coverage: AnalysisCoverage::Completed,
+                verdict: ThreatVerdict::RequiresReview,
+                category: ThreatCategory::Unknown,
+                sha256: None,
+                evidence: vec![ThreatEvidence {
+                    evidence_type: EvidenceType::YaraRule,
+                    identifier: "SignedRuleFixture".into(),
+                }],
+            },
+        };
+        sender.send(WorkerOutcome::TrustedRules(Ok(report))).unwrap();
+        let mut app = DesktopApp {
+            busy: true,
+            rule_mode: true,
+            incoming: Some(receiver),
+            ..DesktopApp::default()
+        };
+        app.poll();
+        assert!(!app.busy);
+        assert!(app.incoming.is_none());
+        assert!(app.report.is_none());
+        assert!(app.status.contains("İnceleme gerekli"));
+        let evidence = app.rule_report.as_ref().unwrap();
+        assert_eq!(evidence.scanner, ScannerId::YaraX);
+        assert_eq!(evidence.assessment.verdict, ThreatVerdict::RequiresReview);
+        assert_eq!(evidence.assessment.category, ThreatCategory::Unknown);
+        assert!(evidence.assessment.sha256.is_none());
+        assert_eq!(evidence.assessment.evidence[0].identifier, "SignedRuleFixture");
+    }
+
+    #[test]
+    fn cancelled_rule_worker_never_publishes_a_late_report() {
+        let (sender, receiver) = mpsc::channel();
+        let report = ScannerReport {
+            scanner: ScannerId::YaraX,
+            assessment: ThreatAssessment {
+                coverage: AnalysisCoverage::Completed,
+                verdict: ThreatVerdict::RequiresReview,
+                category: ThreatCategory::Unknown,
+                sha256: None,
+                evidence: Vec::new(),
+            },
+        };
+        sender.send(WorkerOutcome::TrustedRules(Ok(report))).unwrap();
+        let mut app = DesktopApp {
+            busy: true,
+            rule_mode: true,
+            incoming: Some(receiver),
+            ..DesktopApp::default()
+        };
+        app.cancel.store(true, Ordering::Relaxed);
+        app.poll();
+        assert!(!app.busy);
+        assert!(app.rule_report.is_none());
+        assert!(app.status.contains("iptal"));
     }
 
     #[test]
