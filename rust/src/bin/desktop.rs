@@ -316,7 +316,7 @@ impl DesktopApp {
         };
         egui::Frame::group(ui.style())
             .fill(fill)
-            .stroke(egui::Stroke::new(1.0, outline))
+            .stroke(egui::Stroke::new(1.0_f32, outline))
             .inner_margin(egui::Margin::same(16))
     }
 
