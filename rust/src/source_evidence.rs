@@ -230,11 +230,7 @@ mod tests {
         }
     }
 
-    fn fixture<'a>(
-        name: &'a str,
-        location: SourceLocation,
-        calls: &'a AtomicUsize,
-    ) -> Fixture<'a> {
+    fn fixture<'a>(name: &'a str, location: SourceLocation, calls: &'a AtomicUsize) -> Fixture<'a> {
         Fixture {
             name,
             location,
