@@ -349,6 +349,7 @@ try {
         }
         Write-Host 'RUST_PREVIEW_SETUP_UNINSTALL=PASS'
     }
+    }
 } finally {
     if ($mutexHeld) {
         $setupMutex.ReleaseMutex()
