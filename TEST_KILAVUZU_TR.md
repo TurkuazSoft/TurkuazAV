@@ -16,7 +16,7 @@ Bagimli Oldugu Katman: Documentation | Tool
 2. İndirilen GitHub artifact ZIP'ini bir klasöre açın. İçindeki `TurkuazAV-0.3.1-RUST-UNSIGNED-LOCAL-TEST-win-x64.zip` dosyası asıl uygulama arşividir. Aynı yerdeki `.zip.sha256` dosyası arşivin özetidir.
 3. İsterseniz PowerShell ile, dosyaların bulunduğu klasörde, `Get-FileHash -Algorithm SHA256 .\TurkuazAV-0.3.1-RUST-UNSIGNED-LOCAL-TEST-win-x64.zip` komutunun sonucunu `.zip.sha256` dosyasındaki ilk 64 karakterle karşılaştırın. **Eşleşmiyorsa çalıştırmayın.** SHA-256 karşılaştırması bir yayıncı dijital imzası değildir.
 4. Asıl uygulama ZIP'ini ayrı bir test klasörüne açın; **`turkuazav-desktop.exe`** dosyasını normal kullanıcı olarak çalıştırın. Yönetici yetkisi gerekmez. Kurulum veya kaldırma yapılmaz: test klasörünü silebilirsiniz.
-5. **Dosya seç** veya **Klasör seç**, ardından **SHA-256 tara** seçeneğine basın. Ekrandaki özet bir dosyanın temiz olduğunu kanıtlamaz.
+5. **Dosya seç** veya **Klasör seç**, ardından **SHA-256 analizini başlat** seçeneğine basın. Ekrandaki özet bir dosyanın temiz olduğunu kanıtlamaz.
 
 ## İsteğe bağlı kullanıcı kurulumu (Windows x64)
 
@@ -52,14 +52,14 @@ Linux x64 artifact'ını ve içindeki `.tar.gz` arşivini açın. Masaüstü otu
 ## Manuel kabul kontrol listesi
 
 - [ ] Pencere açılıyor ve sürüm **v0.3.1** olarak görünüyor.
-- [ ] Test dosyası seçiliyor; SHA-256 ve dosya boyutu gösteriliyor.
+- [ ] Test dosyası seçiliyor; SHA-256 ve dosya boyutu gösteriliyor. İşlem kapsamı **SHA-256 hesaplandı**, tehdit değerlendirmesi **Yapılmadı**, kategori **Belirlenmedi** olarak görünüyor.
 - [ ] Klasör seçimiyle ilerleme sayaçları çalışıyor; uzun tarama **İptal** ile durdurulabiliyor.
 - [ ] Yeni bir hedef seçilince önceki dosyanın SHA-256 sonucu siliniyor.
 - [ ] **SHA-256 kopyala** panoya doğru özeti aktarıyor.
 - [ ] Türkçe karakterli klasör/dosya adı sorunsuz çalışıyor.
 - [ ] Pencere yeniden boyutlandırılabiliyor; düğmeler ve uyarı okunabilir kalıyor.
 - [ ] Oturum geçmişi en fazla 20 öğe tutuyor; temizleme düğmesi çalışıyor.
-- [ ] Hata durumunda başarılı sonuç gösterilmiyor; yeniden deneme mümkün.
+- [ ] Hata/atlama durumunda geçersiz veya önceki SHA-256 değeri gösterilmiyor/kopyalanmıyor; yeniden deneme mümkün.
 - [ ] Yerel tanılama kayıtlarında dosya yolu veya hash gibi kişisel bilgiler bulunmuyor.
 
 CI, Windows/Linux'ta ikilileri derleyip paketi açarak başsız testleri çalıştırır. **Bu liste gerçek bir kullanıcı oturumunda ayrıca test edilmelidir.** Testte sorun olursa PR #10 üzerine işletim sistemi, commit SHA'sı, hata metni ve mümkünse gizli bilgi içermeyen ekran görüntüsü ekleyin. Özel dosya yolları ve hassas dosyaları paylaşmayın.
