@@ -79,5 +79,10 @@ version state. Unit tests cover invalid/duplicate IDs, malformed
 digest pins and symlinked publisher paths on Unix. These tests do not
 constitute production key provisioning or user-machine ACL testing.
 
+The separate [candidate staging contract](rule-candidate-staging.md)
+uses this independently provisioned keyring to validate staged rule
+bytes. It never introduces roots, installs active rules, downloads
+packages or advances version state.
+
 No automatic download, key import dialog, privileged install, malware
 verdict, real-time protection or quarantine is enabled by this change.

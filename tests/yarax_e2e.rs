@@ -236,9 +236,14 @@ fn real_yarax_signed_and_trusted_regressions() {
     assert!(verify_package(&rules, &manifest, &signature, &ring).is_err());
     assert_eq!(fs::read(candidate.rules()).unwrap(), active_rules);
     assert_eq!(
-        verify_package(&candidate.rules(), &candidate.manifest(), &candidate.signature(), &ring)
-            .unwrap()
-            .sequence,
+        verify_package(
+            &candidate.rules(),
+            &candidate.manifest(),
+            &candidate.signature(),
+            &ring
+        )
+        .unwrap()
+        .sequence,
         1
     );
     assert_eq!(fs::read(&state).unwrap(), version_before_candidate);
@@ -317,6 +322,21 @@ fn real_yarax_signed_and_trusted_regressions() {
     );
 
     write_package(temp.path(), &private, 1, RULE);
+    let old_state = fs::read(&state).unwrap();
+    assert!(stage_signed_rule_candidate(
+        RuleCandidatePaths {
+            rules: &rules,
+            manifest: &manifest,
+            signature: &signature,
+            engine: &engine,
+            version_state: &state,
+        },
+        &ring,
+        &candidate_root,
+    )
+    .is_err());
+    assert_eq!(fs::read_dir(&candidate_root).unwrap().count(), 0);
+    assert_eq!(fs::read(&state).unwrap(), old_state);
     assert!(scan(&positive, &engine).is_err());
 
     // Failed engine check does not advance the accepted sequence.

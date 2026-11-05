@@ -24,6 +24,8 @@ The storage location must be protected by host permissions. Cooperative writers 
 
 ## Incomplete production controls
 
+Read-only signed rule candidate staging is available in `rust/src/rule_staging.rs`; it copies bounded files into a fresh temporary location and re-verifies that snapshot before returning an uncommitted candidate. It never executes YARA-X or advances the 40-byte rule version. It does not authorize activation: protected storage, filesystem races, cross-process serialization and crash recovery still require a separate privileged transaction. See `docs/rule-candidate-staging.md`.
+
 Publisher trust-root provisioning, secure signed key rotation, protected service installation, process sandboxing and full process-tree termination, remaining local privilege/temporary-directory tamper hardening, target filesystem TOCTOU hardening, additional filesystem fault-injection and crash/power-loss testing, fuzz and performance coverage, real interactive GUI smoke, production signing, quarantine and real-time blocking.
 
 Do not run unsigned preview artifacts as the device's only endpoint protection.

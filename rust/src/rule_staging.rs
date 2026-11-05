@@ -5,16 +5,18 @@
 // Aciklama: Gecici snapshot, imza/motor kontrolu ve yazilmayan rollback denetimi
 // Bagimli Oldugu Katman: Service | Tool | Config
 
-use crate::{config, desktop_rules::inspect_version_snapshot, rules, scan, trusted, TrustedKeyring};
+use crate::{
+    config, desktop_rules::inspect_version_snapshot, rules, scan, trusted, TrustedKeyring,
+};
 use anyhow::{ensure, Context, Result};
+#[cfg(unix)]
+use std::fs::File;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Component, Path},
 };
 use tempfile::{Builder, TempDir};
-#[cfg(unix)]
-use std::fs::File;
 
 /// Inputs must originate from an independently authorized publisher keyring.
 /// Staging is intentionally separate from active-rule installation or selection.
