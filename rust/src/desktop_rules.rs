@@ -43,7 +43,7 @@ pub struct DesktopTrustedRules {
 
 /// Advisory snapshot, not an authorization or a substitute for the locked
 /// atomic anti-rollback check performed after a successful trusted scan.
-fn inspect_version_snapshot(
+pub(crate) fn inspect_version_snapshot(
     state_file: &Path,
     sequence: i64,
     expected_fingerprint: &[u8; 32],

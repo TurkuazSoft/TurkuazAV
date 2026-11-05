@@ -21,8 +21,9 @@ use std::{
 use turkuazav::trusted::{parse_manifest, signature_payload};
 use turkuazav::{
     scan_rules, scan_rules_with_cancel, scan_trusted_rules, scan_trusted_rules_with_cancel,
-    AnalysisCoverage, DesktopTrustedRules, PublisherDigestPin, ScannerId, ThreatCategory,
-    ThreatVerdict, TrustedKeyring, TrustedScanPaths,
+    stage_signed_rule_candidate, verify_package, AnalysisCoverage, DesktopTrustedRules,
+    PublisherDigestPin, RuleCandidatePaths, ScannerId, ThreatCategory, ThreatVerdict,
+    TrustedKeyring, TrustedScanPaths,
 };
 
 const RULE: &str =
@@ -196,6 +197,76 @@ fn real_yarax_signed_and_trusted_regressions() {
     assert!(
         DesktopTrustedRules::from_trusted_bootstrap(&[], temp.path(), &engine, &state).is_err()
     );
+
+    // A candidate is snapshotted in a fresh temporary directory, never
+    // activated or persisted as the currently trusted package.
+    let candidate_root = temp.path().join("candidate-staging");
+    fs::create_dir(&candidate_root).unwrap();
+    let active_rules = fs::read(&rules).unwrap();
+    let version_before_candidate = fs::read(&state).unwrap();
+    let candidate = stage_signed_rule_candidate(
+        RuleCandidatePaths {
+            rules: &rules,
+            manifest: &manifest,
+            signature: &signature,
+            engine: &engine,
+            version_state: &state,
+        },
+        &ring,
+        &candidate_root,
+    )
+    .unwrap();
+    assert_eq!(candidate.sequence, 1);
+    assert_eq!(candidate.publisher_key_id, "trusted-a");
+    assert_eq!(fs::read(candidate.rules()).unwrap(), active_rules);
+    assert_eq!(fs::read(&state).unwrap(), version_before_candidate);
+    assert_eq!(fs::read_dir(&candidate_root).unwrap().count(), 1);
+
+    let staged_verified = verify_package(
+        &candidate.rules(),
+        &candidate.manifest(),
+        &candidate.signature(),
+        &ring,
+    )
+    .unwrap();
+    assert_eq!(staged_verified.sequence, 1);
+
+    // Replacing the source after staging cannot modify the verified copy.
+    fs::write(&rules, b"tampered source after staging").unwrap();
+    assert!(verify_package(&rules, &manifest, &signature, &ring).is_err());
+    assert_eq!(fs::read(candidate.rules()).unwrap(), active_rules);
+    assert_eq!(
+        verify_package(&candidate.rules(), &candidate.manifest(), &candidate.signature(), &ring)
+            .unwrap()
+            .sequence,
+        1
+    );
+    assert_eq!(fs::read(&state).unwrap(), version_before_candidate);
+    drop(candidate);
+    assert_eq!(fs::read_dir(&candidate_root).unwrap().count(), 0);
+    // Original active source contents were not overwritten by the staging API.
+    assert_eq!(fs::read(&rules).unwrap(), b"tampered source after staging");
+    fs::write(&rules, &active_rules).unwrap();
+
+    // An invalid candidate must fail without writing state or leaving a
+    // partial candidate directory behind.
+    let good_signature = fs::read(&signature).unwrap();
+    fs::write(&signature, b"invalid signature").unwrap();
+    assert!(stage_signed_rule_candidate(
+        RuleCandidatePaths {
+            rules: &rules,
+            manifest: &manifest,
+            signature: &signature,
+            engine: &engine,
+            version_state: &state,
+        },
+        &ring,
+        &candidate_root,
+    )
+    .is_err());
+    assert_eq!(fs::read_dir(&candidate_root).unwrap().count(), 0);
+    assert_eq!(fs::read(&state).unwrap(), version_before_candidate);
+    fs::write(&signature, good_signature).unwrap();
 
     // Different signed content cannot reuse an accepted sequence.
     write_package(temp.path(), &private, 1, OTHER_RULE);
