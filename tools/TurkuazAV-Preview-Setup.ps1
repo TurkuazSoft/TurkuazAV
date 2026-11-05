@@ -170,10 +170,10 @@ function Request-RecycleConsent([string]$destination) {
         throw 'Replacing an existing folder requires an interactive user.'
     }
     Write-Warning "Kurulum klasörü zaten mevcut: $destination"
-    Write-Warning 'Onay verirseniz mevcut klasör tüm içeriğiyle Windows Geri Dönüşüm Kutusu’na gönderilecektir.'
+    Write-Warning 'Onay verirseniz mevcut klasör tüm içeriğiyle Windows Geri Dönüşüm Kutusu''na gönderilecektir.'
     Write-Warning 'Geri yükleme garanti değildir: kutu devre dışı, dolu veya boşaltılmış olabilir.'
     Write-Warning 'Önemli dosyaları ayrıca yedekleyin ve uygulamayı önce kapatın.'
-    $answer = Read-Host 'Mevcut klasörü Geri Dönüşüm Kutusu’na göndermeyi onaylamak için EVET yazın'
+    $answer = Read-Host 'Mevcut klasörü Geri Dönüşüm Kutusu''na göndermeyi onaylamak için EVET yazın'
     if ($answer -cne 'EVET') {
         throw 'User declined existing-folder replacement; installation unchanged.'
     }
@@ -299,7 +299,7 @@ try {
             $committed = $true
         } catch {
             if ($recycledOld) {
-                Write-Warning 'Kurulum tamamlanamadı. Eski dosyalar için Geri Dönüşüm Kutusu’nu kontrol edin.'
+                Write-Warning 'Kurulum tamamlanamadı. Eski dosyalar için Geri Dönüşüm Kutusu''nu kontrol edin.'
             }
             throw
         } finally {
