@@ -3,14 +3,14 @@ Dosya Yolu: REPO_ROOT/docs/security-model.md
 Amac: Rust signed-rule trust ve anti-rollback guven kontrati
 Modul - FileType: Documentation - Markdown
 Version: 0.3.1
-Aciklama: V0.2.4 signature/state compatibility and remaining risks
+Aciklama: Rust imza dogrulama, state semasi ve guvenlik sinirlari
 Bagimli Oldugu Katman: Service | Repo | Tool | Config
 -->
 # TurkuazAV Rust Security Model
 
 This v0.3.1 experimental implementation is not a full antivirus. It does not provide real-time blocking or malware verdicts.
 
-## Signed rule package contract (preserved from 0.2.4)
+## Signed rule package contract (v1)
 
 1. Publisher keys are pinned by an independently trusted application bootstrap, never by the untrusted manifest or public-key CLI argument.
 2. Strict manifest fields: `schema`, `sequence` (positive signed 64-bit integer), `keyId`, `rulesSha256` (64 lower-case hex characters).
@@ -18,9 +18,9 @@ This v0.3.1 experimental implementation is not a full antivirus. It does not pro
 4. Verify key ID and RSA key strength (at least 2048-bit), signature and content hash before providing rule bytes to the engine.
 5. Store verified rule bytes and bounded target snapshot in a temporary private directory; stage a bounded private executable copy and verify **the staged bytes** against the pinned official YARA-X SHA-256 before spawning it.
 6. Only after successful real engine execution and validated NDJSON output, commit the anti-rollback state.
-7. Persistent state has exactly 40 bytes: 8-byte little-endian positive sequence + 32-byte SHA-256 canonical-payload fingerprint. Older sequences and same-sequence/different-payload are denied. Invalid/legacy 8-byte records fail closed.
+7. Persistent state has exactly 40 bytes: 8-byte little-endian positive sequence + 32-byte SHA-256 canonical-payload fingerprint. Older sequences and same-sequence/different-payload are denied. Invalid 8-byte-only records fail closed.
 
-The storage location must be protected by host permissions. Cooperative writers lock a stable sibling `.lock` file, stage the 40-byte record in the same directory, fsync the staging file and atomically replace the state (plus directory sync on Unix). An existing 0-byte state is now corruption, while a missing state can bootstrap a new installation. Atomic updates reduce partial-write exposure but cannot defeat privileged state deletion/rollback, filesystem compromise or power-loss guarantees on every Windows filesystem. No automatic legacy state migration occurs.
+The storage location must be protected by host permissions. Cooperative writers lock a stable sibling `.lock` file, stage the 40-byte record in the same directory, fsync the staging file and atomically replace the state (plus directory sync on Unix). An existing 0-byte state is now corruption, while a missing state can bootstrap a new installation. Atomic updates reduce partial-write exposure but cannot defeat privileged state deletion/rollback, filesystem compromise or power-loss guarantees on every Windows filesystem. No automatic repair or conversion of an invalid state record occurs.
 
 ## Incomplete production controls
 

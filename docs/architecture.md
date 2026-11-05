@@ -26,4 +26,4 @@ Rust modules retain logical Controller / Service / Repository / Tool / View / Co
 
 When copying a mutable target for YARA-X, the snapshot may contain concurrent writes; additional filesystem and process isolation is needed for production antivirus uses.
 
-See [migration tests](rust-migration.md) and [security model](security-model.md).
+See the [security model](security-model.md), [desktop preview](windows-desktop-preview.md) and the root [test guide](../TEST_KILAVUZU_TR.md).

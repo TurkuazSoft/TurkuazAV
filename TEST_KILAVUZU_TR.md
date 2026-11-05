@@ -45,4 +45,4 @@ Linux x64 artifact'ını ve içindeki `.tar.gz` arşivini açın. Masaüstü otu
 
 CI, Windows/Linux'ta ikilileri derleyip paketi açarak başsız testleri çalıştırır. **Bu liste gerçek bir kullanıcı oturumunda ayrıca test edilmelidir.** Testte sorun olursa PR #10 üzerine işletim sistemi, commit SHA'sı, hata metni ve mümkünse gizli bilgi içermeyen ekran görüntüsü ekleyin. Özel dosya yolları ve hassas dosyaları paylaşmayın.
 
-Eski .NET 0.3.1 kaynakları Git geçmişinde ve `main` dalında referans olarak korunur. Bu test paketi otomatik üretim güncellemesi değildir.
+Bu Rust test paketi otomatik üretim güncellemesi değildir. Kurulum, gerçek zamanlı koruma ve zararlı yazılım temizleme özellikleri henüz sunulmamaktadır.

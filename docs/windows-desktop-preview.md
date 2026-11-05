@@ -8,7 +8,7 @@ Bagimli Oldugu Katman: View | Controller | Service
 -->
 # Rust Native Desktop Preview
 
-The Rust desktop (`rust/src/bin/desktop.rs`) uses eframe/egui, a native file picker and clipboard. It is available as an optional Cargo feature on Windows and Linux. It replaces the WinUI 3 preview and does not expose trusted publisher or YARA-X scanning.
+The Rust desktop (`rust/src/bin/desktop.rs`) uses eframe/egui, a native file picker and clipboard. It is available as an optional Cargo feature on Windows and Linux. The GUI does not expose trusted publisher or YARA-X scanning.
 
 Features: select a file or directory, clear old hash when selection changes, stream SHA-256 scan results through a worker with cancel control and live hashed/skipped/failed counters, display the last completed file report/status/byte size/hash, copy its hash, limit session history to 20 in-memory entries, clear history and write diagnostics with code/category only (no paths, digests or exception messages). A partial or cancelled scan never presents its final result as successful. Diagnostics are written under the OS-specific local data directory, retained for seven days.
 
@@ -18,4 +18,4 @@ The packaged GUI executable supports the explicitly requested `--headless-self-t
 
 No real-time protection, deletion, quarantine, driver or malware verdict is provided. Windows/Linux native GUI compilation in CI is not a substitute for real interactive smoke testing. Unsigned Windows and Linux CI archives include the Rust GUI and CLI together, plus SHA256SUMS, archive checksum and a Turkish user-facing `TEST_KILAVUZU_TR.md` quickstart. The guide is covered by the post-extraction file-count and SHA-256 verification. They are for isolated local testing, not production installers.
 
-Manual acceptance still required for file and folder pickers, folder progress, cancellation, clipboard, history reset, light/dark theme, compact navigation at 600px minimum width, resize, Unicode paths, Linux desktop launch, Windows desktop launch and unexpected failures. No manual testing is requested from the user before the ongoing Rust conversion is ready for acceptance.
+Manual acceptance still required for file and folder pickers, folder progress, cancellation, clipboard, history reset, light/dark theme, compact navigation at 600px minimum width, resize, Unicode paths, Linux desktop launch, Windows desktop launch and unexpected failures. A successful automated build does not complete these manual acceptance requirements.
