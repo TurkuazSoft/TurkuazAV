@@ -10,6 +10,8 @@ Bagimli Oldugu Katman: Documentation
 
 - `rust/src/config.rs`: fixed limits and platform-specific YARA-X executable SHA-256 pins
 - `rust/src/scan.rs`: read-only file enumeration, bounded streaming SHA-256, symlink/reparse handling and cancellation
+- `rust/src/scanner.rs`: product-level ScannerBackend API, SHA-256 adapter and signed YARA-X adapter, cancellation guard and path-free ScannerReport
+- `rust/src/threat.rs`: neutral threat category, coverage, verdict and bounded evidence model; never creates a clean or malware verdict from hash/rule matches
 - `rust/src/monitor.rs`: bounded read-only SHA-256 directory polling and in-memory delta state
 - `rust/src/native_events.rs`: opt-in Windows recursive change notification / Linux inotify root notification hint adapter; periodic full-tree polling fallback remains authoritative, no daemon or blocking hook
 - `rust/src/service.rs`: bounded one-slot atomic reconciliation request, independent trigger handle, failure/cancel replay, root-scoped scanning
@@ -21,6 +23,37 @@ Bagimli Oldugu Katman: Documentation
 - `rust/src/trusted.rs`: strict manifest parser, pinned publisher keyring, canonical signed payload and protected anti-rollback 40-byte format
 - `rust/src/bin/cli.rs`: console controller and textual report
 - `rust/src/bin/desktop.rs`: native UI, in-memory session history, clipboard and privacy-preserving diagnostics
+
+## Scanner naming and dependency boundaries
+
+The **TurkuazAV Scanner** is the product's generic scan capability; **YARA-X**
+remains the upstream engine name and must not be renamed in binary pins,
+signed manifest contracts, developer CLI commands or vendor attribution.
+
+```text
+CLI / Desktop / Service (existing entry points preserved)
+                |
+   ScannerBackend -> ScannerReport -> ThreatAssessment
+      |                                  (no blocking policy)
+      +-- Sha256Scanner -> scan.rs (read-only digest)
+      +-- TrustedYaraXScanner -> trusted.rs -> rules.rs -> YARA-X binary
+                                    |             |
+                             verified publisher   pinned executable hash
+```
+
+This is a single Rust crate with typed adapters, not an Apache-style cluster
+or a new background service. The adapter boundary is optional for existing
+callers: legacy APIs remain source- and CLI-compatible, and desktop continues
+to show SHA-256 only. ScannerReport contains the engine identifier and a
+path-free assessment. It carries no authority to block, quarantine or
+persist files. Only the existing trusted signed-rule path can be used by the
+new YARA-X adapter; the developer-only `scan-rules` CLI is NOT promoted to
+a trusted publisher path.
+
+The core principles borrowed from mature Apache projects are small public
+interfaces, clear responsibilities, explicit error behavior, isolated
+adapters and automated contract tests. We do not copy project-specific
+Apache infrastructure or introduce extra crates solely for layering.
 
 Rust modules retain logical Controller / Service / Repository / Tool / View / Config separation. No permanent scan history and no automatic malware verdict. YARA-X uses a pinned external executable; integration is deliberately library-controlled and independent of UI. A production-provisioned trust root is still required.
 
