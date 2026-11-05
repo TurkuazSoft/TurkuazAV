@@ -173,7 +173,9 @@ switch ($Action) {
                 [Text.UTF8Encoding]::new($false)
             )
             # Same-parent directory rename: do not modify existing installation.
-            Move-Item -LiteralPath $stage -Destination $installRoot
+            # Directory.Move rejects an already-existing destination, including
+            # one created by a concurrent installer after the initial check.
+            [IO.Directory]::Move($stage, $installRoot)
             $committed = $true
         } finally {
             if (-not $committed -and (Test-Path -LiteralPath $stage)) {
