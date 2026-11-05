@@ -23,6 +23,7 @@ $fixture = Join-Path $env:RUNNER_TEMP ('turkuazav-preview-install-' + [guid]::Ne
 $extracted = Join-Path $fixture 'extracted'
 $installed = Join-Path $fixture 'installed'
 $tampered = Join-Path $fixture 'tampered'
+$ciRecycle = Join-Path $fixture 'simulated-recycle'
 $setupName = 'TurkuazAV-Preview-Setup.ps1'
 try {
     $null = New-Item -ItemType Directory -Path $fixture
@@ -50,7 +51,7 @@ try {
 
     $reinstallRejected = $false
     try {
-        & $setup -Action Install -CiInstallRoot $installed -NoShortcuts | Out-Null
+        & $setup -Action Install -CiInstallRoot $installed -CiRecycleRoot $ciRecycle -NoShortcuts | Out-Null
     } catch {
         $reinstallRejected = $true
     }
@@ -58,6 +59,46 @@ try {
         throw 'Installer unexpectedly overwrote the existing preview.'
     }
     Write-Host 'RUST_PREVIEW_REINSTALL_REJECTED=PASS'
+
+    # Replacement approval recycles the complete previous folder before the
+    # verified staging directory is renamed into place. CI intentionally
+    # emulates the Recycle Bin in an isolated fixture rather than modifying
+    # the hosted runner's actual Windows Recycle Bin.
+    $oldEvidence = Join-Path $installed 'restore-me.txt'
+    [IO.File]::WriteAllText($oldEvidence, 'previous user data')
+    & $setup -Action Install -CiInstallRoot $installed -CiRecycleRoot $ciRecycle -CiApproveReplacement -NoShortcuts
+    $recycled = @(Get-ChildItem -LiteralPath $ciRecycle -Directory)
+    if ($recycled.Count -ne 1 -or
+        -not (Test-Path -LiteralPath (Join-Path $recycled[0].FullName 'restore-me.txt')) -or
+        (Test-Path -LiteralPath $oldEvidence) -or
+        -not (Test-Path -LiteralPath (Join-Path $installed 'turkuazav-desktop.exe'))) {
+        throw 'Approved reinstall did not retain prior data in the isolated recycle fixture.'
+    }
+    Write-Host 'RUST_PREVIEW_APPROVED_REPLACEMENT_RECOVERABLE=PASS'
+
+    # An error AFTER the previous directory is recycled must preserve its
+    # recoverable copy and refuse to present a partial installation as ready.
+    $postFailureEvidence = Join-Path $installed 'post-failure-note.txt'
+    [IO.File]::WriteAllText($postFailureEvidence, 'recover after failure')
+    $failedAfterRecycle = $false
+    try {
+        & $setup -Action Install -CiInstallRoot $installed -CiRecycleRoot $ciRecycle -CiApproveReplacement -CiFailAfterRecycle -NoShortcuts | Out-Null
+    } catch {
+        $failedAfterRecycle = $true
+    }
+    $recycled = @(Get-ChildItem -LiteralPath $ciRecycle -Directory)
+    $retainedEvidence = @($recycled | Where-Object {
+        Test-Path -LiteralPath (Join-Path $_.FullName 'post-failure-note.txt')
+    })
+    if (-not $failedAfterRecycle -or $recycled.Count -ne 2 -or
+        $retainedEvidence.Count -ne 1 -or
+        (Test-Path -LiteralPath $installed)) {
+        throw 'Post-recycle interruption did not preserve the previous directory.'
+    }
+    Write-Host 'RUST_PREVIEW_INTERRUPTED_REPLACEMENT_RECOVERABLE=PASS'
+
+    # A clean installation is still possible after the interrupted attempt.
+    & $setup -Action Install -CiInstallRoot $installed -NoShortcuts
 
     # The installer must not delete unrelated or user-owned files.
     $userFile = Join-Path $installed 'user-note.txt'
