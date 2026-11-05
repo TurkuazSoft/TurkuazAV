@@ -11,8 +11,8 @@ pub mod native_events;
 pub mod rules;
 pub mod scan;
 pub mod service;
-pub mod trusted;
 pub mod threat;
+pub mod trusted;
 pub mod update;
 pub mod update_transaction;
 pub mod worker;
@@ -24,7 +24,9 @@ pub use rules::{
 };
 pub use scan::{scan_file, scan_path, scan_path_each, FileScanResult, ScanStatus};
 pub use service::{ReconcileSignal, ScanCoordinator};
-pub use threat::{AnalysisCoverage, EvidenceType, ThreatAssessment, ThreatCategory, ThreatEvidence, ThreatVerdict};
+pub use threat::{
+    AnalysisCoverage, EvidenceType, ThreatAssessment, ThreatCategory, ThreatEvidence, ThreatVerdict,
+};
 pub use trusted::{
     accept_version, scan_trusted_rules, scan_trusted_rules_with_cancel, verify_package,
     TrustedKeyring, TrustedScanPaths, VerifiedRulePackage,
