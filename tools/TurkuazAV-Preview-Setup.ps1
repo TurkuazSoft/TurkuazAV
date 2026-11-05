@@ -11,7 +11,10 @@ param(
     [ValidateSet('Verify', 'Install', 'Uninstall')]
     [string]$Action,
     [string]$CiInstallRoot,
-    [switch]$NoShortcuts
+    [switch]$NoShortcuts,
+    [switch]$CiApproveReplacement,
+    [string]$CiRecycleRoot,
+    [switch]$CiFailAfterRecycle
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,6 +46,25 @@ if (-not [string]::IsNullOrWhiteSpace($CiInstallRoot)) {
     }
     $installRoot = [IO.Path]::GetFullPath($CiInstallRoot)
     $NoShortcuts = $true
+}
+
+# CI-only injectable recycle destination: the user-facing code must always
+# request an explicit approval and use the actual Windows Recycle Bin.
+if ($CiApproveReplacement -or $CiFailAfterRecycle -or
+    -not [string]::IsNullOrWhiteSpace($CiRecycleRoot)) {
+    if ([string]::IsNullOrWhiteSpace($CiInstallRoot) -or
+        $env:GITHUB_ACTIONS -cne 'true' -or
+        $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or
+        [string]::IsNullOrWhiteSpace($CiRecycleRoot)) {
+        throw 'Recycle test overrides are restricted to trusted hosted CI fixtures.'
+    }
+    $tempRoot = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\') + '\'
+    $ciRecycle = [IO.Path]::GetFullPath($CiRecycleRoot)
+    if (-not $ciRecycle.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        $ciRecycle.Equals($installRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'CI recycle destination must be an isolated runner temporary path.'
+    }
+    $CiRecycleRoot = $ciRecycle
 }
 
 function Assert-NoReparse([string]$path) {
@@ -123,6 +145,74 @@ function Add-Shortcut([string]$destination) {
     $link.Save()
 }
 
+function Test-OwnedShortcut([string]$destination) {
+    $shortcut = ShortcutPath
+    Assert-NoReparse $shortcut
+    if ($null -eq (Get-Item -LiteralPath $shortcut -Force -ErrorAction SilentlyContinue)) {
+        return $false
+    }
+    $shell = New-Object -ComObject WScript.Shell
+    $link = $shell.CreateShortcut($shortcut)
+    if ($link.TargetPath -ine (Join-Path $destination 'turkuazav-desktop.exe')) {
+        throw 'An unrelated Start Menu shortcut already uses this name.'
+    }
+    return $true
+}
+
+function Request-RecycleConsent([string]$destination) {
+    if (-not [string]::IsNullOrWhiteSpace($CiRecycleRoot)) {
+        if (-not $CiApproveReplacement) {
+            throw 'An existing installation cannot be replaced without explicit approval.'
+        }
+        return
+    }
+    if (-not [Environment]::UserInteractive) {
+        throw 'Replacing an existing folder requires an interactive user.'
+    }
+    Write-Warning "Klasor zaten var: $destination"
+    Write-Warning 'Onay verirseniz MEVCUT klasor tum icerigiyle Windows Geri Donusum Kutusuna gonderilecek.'
+    Write-Warning 'Bu islem geri alinabilir diye garanti verilmez: kutu devre disi, dolu veya bosaltilmis olabilir.'
+    Write-Warning 'Onemli dosyalari ayrica yedekleyin ve uygulamayi once kapatin.'
+    $answer = Read-Host 'Devam etmek ve mevcut klasoru Geri Donusum Kutusuna tasimak icin EVET yazin'
+    if ($answer -cne 'EVET') {
+        throw 'User declined existing-folder replacement; installation unchanged.'
+    }
+}
+
+function Move-ExistingToRecycle([string]$destination) {
+    Assert-NoReparse $destination
+    if (-not [IO.Directory]::Exists($destination)) {
+        throw 'The existing installation is no longer a normal directory.'
+    }
+    # Reject nested reparse points so unexpected linked directories cannot
+    # extend the replacement scope.
+    foreach ($child in @(Get-ChildItem -LiteralPath $destination -Force -Recurse -ErrorAction Stop)) {
+        if (($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'Existing installation contains a reparse point; replacement refused.'
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($CiRecycleRoot)) {
+        # CI fixture emulates the recycle destination without operating on the
+        # real user Recycle Bin; this does not prove shell recycle behavior.
+        Assert-NoReparse $CiRecycleRoot
+        $null = New-Item -ItemType Directory -Path $CiRecycleRoot -Force
+        $archive = Join-Path $CiRecycleRoot ('TurkuazAV-Preview-' + [guid]::NewGuid().ToString('N'))
+        [IO.Directory]::Move($destination, $archive)
+        Write-Host 'RUST_PREVIEW_CI_RECYCLE_EMULATED=PASS'
+    } else {
+        [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
+            $destination,
+            [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
+            [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin,
+            [Microsoft.VisualBasic.FileIO.UICancelOption]::ThrowException
+        )
+    }
+    if ($null -ne (Get-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue)) {
+        throw 'Existing folder was not moved; new installation refused.'
+    }
+    Write-Host 'RUST_PREVIEW_EXISTING_FOLDER_MOVED=PASS'
+}
+
 function Remove-OwnedShortcut([string]$destination) {
     $shortcut = ShortcutPath
     Assert-NoReparse $shortcut
@@ -146,21 +236,22 @@ switch ($Action) {
     'Install' {
         Assert-Payload $sourceRoot
         Assert-NoReparse $installRoot
-        if ($null -ne (Get-Item -LiteralPath $installRoot -Force -ErrorAction SilentlyContinue)) {
-            throw 'A preview installation already exists; no overwrite or automatic upgrade is allowed.'
+        $sourcePath = [IO.Path]::GetFullPath($sourceRoot).TrimEnd('\')
+        $targetPath = [IO.Path]::GetFullPath($installRoot).TrimEnd('\')
+        if ($sourcePath.Equals($targetPath, [StringComparison]::OrdinalIgnoreCase) -or
+            $sourcePath.StartsWith($targetPath + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Use setup from an extracted package outside the installation directory.'
         }
         $parent = Split-Path -Path $installRoot -Parent
         Assert-NoReparse $parent
         $null = New-Item -ItemType Directory -Path $parent -Force
+        $shortcutOwned = $false
         if (-not $NoShortcuts) {
-            $shortcut = ShortcutPath
-            Assert-NoReparse $shortcut
-            if ($null -ne (Get-Item -LiteralPath $shortcut -Force -ErrorAction SilentlyContinue)) {
-                throw 'An existing Start Menu shortcut prevents installation.'
-            }
+            $shortcutOwned = Test-OwnedShortcut $installRoot
         }
         $stage = Join-Path $parent ('.turkuazav-preview-stage-' + [guid]::NewGuid().ToString('N'))
         $committed = $false
+        $recycledOld = $false
         try {
             $null = New-Item -ItemType Directory -Path $stage
             foreach ($name in $expectedFiles) {
@@ -172,18 +263,36 @@ switch ($Action) {
                 $markerValue,
                 [Text.UTF8Encoding]::new($false)
             )
-            # Same-parent directory rename: do not modify existing installation.
-            # Directory.Move rejects an already-existing destination, including
-            # one created by a concurrent installer after the initial check.
+            # Reconcile the old directory only after the replacement payload
+            # has been independently verified and fully staged.
+            $existing = Get-Item -LiteralPath $installRoot -Force -ErrorAction SilentlyContinue
+            if ($null -ne $existing) {
+                if (-not $existing.PSIsContainer) {
+                    throw 'An unrelated file occupies the installation path.'
+                }
+                Request-RecycleConsent $installRoot
+                Move-ExistingToRecycle $installRoot
+                $recycledOld = $true
+            }
+            if ($CiFailAfterRecycle -and $recycledOld) {
+                throw 'CI injected post-recycle install interruption.'
+            }
+            # Same-parent directory rename refuses a concurrent destination
+            # rather than overwriting its contents.
             [IO.Directory]::Move($stage, $installRoot)
             $committed = $true
+        } catch {
+            if ($recycledOld) {
+                Write-Warning 'Yeni kurulum tamamlanamadi. Eski dosyalar icin Geri Donusum Kutusunu kontrol edin.'
+            }
+            throw
         } finally {
             if (-not $committed -and (Test-Path -LiteralPath $stage)) {
                 Assert-NoReparse $stage
                 Remove-Item -LiteralPath $stage -Recurse -Force
             }
         }
-        if (-not $NoShortcuts) {
+        if (-not $NoShortcuts -and -not $shortcutOwned) {
             try {
                 Add-Shortcut $installRoot
             } catch {
