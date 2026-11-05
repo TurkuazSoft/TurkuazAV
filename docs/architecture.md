@@ -12,6 +12,7 @@ Bagimli Oldugu Katman: Documentation
 - `rust/src/scan.rs`: read-only file enumeration, bounded streaming SHA-256, symlink/reparse handling and cancellation
 - `rust/src/scanner.rs`: product-level ScannerBackend API, SHA-256 adapter and signed YARA-X adapter, cancellation guard and path-free ScannerReport
 - `rust/src/threat.rs`: neutral threat category, coverage, verdict and bounded evidence model; never creates a clean or malware verdict from hash/rule matches
+- `rust/src/policy.rs`: pure advisory decisions from ScannerReport; incomplete or inconsistent evidence requests another analysis, never automatic blocking
 - `rust/src/monitor.rs`: bounded read-only SHA-256 directory polling and in-memory delta state
 - `rust/src/native_events.rs`: opt-in Windows recursive change notification / Linux inotify root notification hint adapter; periodic full-tree polling fallback remains authoritative, no daemon or blocking hook
 - `rust/src/service.rs`: bounded one-slot atomic reconciliation request, independent trigger handle, failure/cancel replay, root-scoped scanning
@@ -49,6 +50,15 @@ path-free assessment. It carries no authority to block, quarantine or
 persist files. Only the existing trusted signed-rule path can be used by the
 new YARA-X adapter; the developer-only `scan-rules` CLI is NOT promoted to
 a trusted publisher path.
+
+The policy layer is intentionally read-only: `advise(&ScannerReport)`
+checks the reported engine, scan coverage and evidence consistency.
+It can suggest manual review, no automatic action or a retry, but exposes
+no quarantine, deletion or process-control interface. The desktop now uses
+this same policy when deciding whether to display trusted YARA-X evidence.
+The ScannerId field alone does not authenticate the origin of a report;
+existing publisher signature and pinned executable verification remain
+the security boundary.
 
 The core principles borrowed from mature Apache projects are small public
 interfaces, clear responsibilities, explicit error behavior, isolated
