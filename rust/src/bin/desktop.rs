@@ -577,8 +577,7 @@ impl DesktopApp {
             if ui
                 .add_enabled(
                     self.trusted_rules.is_some() && !self.busy,
-                    egui::Button::new("İmzalı paket ön denetimi")
-                        .min_size(egui::vec2(190.0, 44.0)),
+                    egui::Button::new("İmzalı paket ön denetimi").min_size(egui::vec2(190.0, 44.0)),
                 )
                 .clicked()
             {
@@ -1166,11 +1165,9 @@ mod tests {
             assert!(!app.busy);
             assert!(!app.preflight_ready);
             assert!(app.rule_report.is_none());
-            assert!(app.status.contains(if cancel {
-                "iptal"
-            } else {
-                "başarısız"
-            }));
+            assert!(app
+                .status
+                .contains(if cancel { "iptal" } else { "başarısız" }));
         }
     }
 
