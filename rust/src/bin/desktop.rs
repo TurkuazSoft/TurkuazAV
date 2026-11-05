@@ -385,7 +385,8 @@ impl DesktopApp {
                                     self.preflight_ready = false;
                                     self.rule_report = None;
                                     log_event("RULE_SCAN_FAILED", "InconsistentReport");
-                                    self.status = "Analiz raporu tutarsız; yeniden doğrulama gerekli.".into();
+                                    self.status =
+                                        "Analiz raporu tutarsız; yeniden doğrulama gerekli.".into();
                                 }
                             }
                         }
