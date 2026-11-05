@@ -19,7 +19,7 @@ pub mod update;
 pub mod update_transaction;
 pub mod worker;
 
-pub use desktop_rules::DesktopTrustedRules;
+pub use desktop_rules::{DesktopRulePreflight, DesktopTrustedRules};
 pub use monitor::{ChangeKind, DirectoryObserver, ObservedChange};
 pub use native_events::{NativeChangeWakeup, WakeReason};
 pub use rules::{
