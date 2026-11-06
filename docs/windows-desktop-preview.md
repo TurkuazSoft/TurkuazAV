@@ -1,53 +1,25 @@
-# 📄 Dosya Yolu: /TurkuazAV/docs/windows-desktop-preview.md
-# 📌 Amac: WinUI 3 deneysel masaustu uygulamasinin derleme ve test ilkelerini aciklamak
-# 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.3.1
-# Aciklama: Windows x64 GUI ilk asama dis politikasi
-# Bagimli Oldugu Katman: Controller | Service | Repo | View | Language
+<!--
+Dosya Yolu: REPO_ROOT/docs/windows-desktop-preview.md
+Amac: Rust native GUI 0.3.1 arayuz akislarini tanimlar
+Modul - FileType: Documentation - Markdown
+Version: 0.3.1
+Aciklama: Windows ve Linux Rust arayuz testi
+Bagimli Oldugu Katman: View | Controller | Service
+-->
+# Rust Native Desktop Preview
 
-# Windows Desktop Preview
+The Rust desktop (`rust/src/bin/desktop.rs`) uses eframe/egui, a native file picker and clipboard. It is available as an optional Cargo feature on Windows and Linux. The desktop contains a review-only signed YARA-X adapter and a separate **signed-bundle preflight** action. For a future independently authenticated release, the startup contract can load publisher public keys from local storage **only** if their entire PEM contents match SHA-256 digests already compiled into the app, followed by RSA validation. The shipped preview does **not** provision any publisher digest pins. Accordingly both actions are **disabled**, rather than accepting an arbitrary local PEM or bypassing verification.
 
-TurkuazAV.Desktop yalnizca Windows x64 WinUI 3 uygulamasidir.
-Ortak `TurkuazAV.Core` Linux ve Windows'ta ayri test edilir.
-GUI `HashScanController` ile `ScanService` is mantigina erisir.
+Features: select a file or directory, clear old hash when selection changes, stream SHA-256 scan results through a worker with cancel control and live hashed/skipped/failed counters, display the last completed file report/status/byte size/hash, copy its hash, limit session history to 20 in-memory entries, clear history and write diagnostics with code/category only (no paths, digests or exception messages). A partial or cancelled scan never presents its final result as successful. Diagnostics are written under the OS-specific local data directory, retained for seven days.
 
-## MVP kisitlari
+The Horizon report derives its read-only hash coverage from `ThreatAssessment::from_hash_scan`: `completed`, `skipped` or `failed`. It visibly separates SHA-256 processing from malware assessment (`not_evaluated`, category `unknown`). Only a validated SHA-256 digest is displayed or offered for clipboard copying; failed, skipped or malformed results never show a digest. This is not YARA-X evaluation or a clean verdict. The packaged desktop headless smoke also verifies these typed assessment invariants.
 
-1. Kullanici tek dosya secer.
-2. Tek bir SHA-256 raporu hesaplanir, dosya boyutu ve durum gosterilir.
-3. Kullanici iptal eder veya farkli dosya secer.
-4. Oturum gecmisi sadece bellektedir; disk/telemetri aktarimi yoktur.
+`rust/src/desktop_rules.rs` now connects a separately bootstrapped publisher keyring to the existing `TrustedYaraXScanner` only. After a future independently verified publisher bootstrap, a user-selected **single file** can be scanned on a cancellable worker thread using the signed-rule manifest, pinned YARA-X engine digest and the existing 40-byte anti-rollback state. The GUI shows bounded matching rule identifiers as **requires review** evidence, not as a malware family or automatic blocking action. Empty matches are **not evaluated**, not clean. Cancellation, missing keys, invalid packages and engine failures produce no trusted rule report; errors are redacted from UI diagnostics. The code does not accept publisher roots from a user file, manifest, CLI argument or environment variable. The packaged unsigned preview currently has no publisher root, so both actions remain inactive. When a future independently signed release provisions a pinned publisher, the GUI explicitly requests a manual preflight before enabling a single-file YARA-X scan. Preflight validates the signed local bundle, engine hash/size and an advisory read-only snapshot of the 40-byte anti-rollback record on a background worker. Its pass/fail status never changes the version state, never runs the engine and never claims malware safety. On cancel or verification failure the scan remains disabled. Preflight is a hint only: a later scan revalidates the signed package, executes from a verified staged engine and performs the existing locked anti-rollback acceptance after successful analysis. Production publisher provisioning, protected storage, filesystem race hardening and interactive native UI acceptance remain incomplete. CI tests the same signed runtime path using an ephemeral test key and real YARA-X; this does not provision production trust. Note that the user profile directory/anti-rollback state would still require OS ACL hardening before production enablement.
 
-GUI bilerek YARA-X ya da imzali rule tarama yapmaz. Ilk asamada
-kullanicidan secilen key ile guvenilir publisher raporu gostermeyi
-reddederiz; uretim trust root ve korunan state provisioning
-olusturulmadan bunu sunmak guvenli olmaz.
+The Horizon preview adds five navigable areas (Overview, File Analysis, Session History, Modules and Settings), an optional light theme, teal action buttons, visible scan counters and explicit unavailable-feature labels. Navigation becomes a wrapped row at narrow window widths; the native window starts at 1120x770 logical points with a 600x480 minimum. The in-progress scan has no completion percentage because directory enumeration does not supply a reliable total file count. Theme selection and session history are not persisted across launches. Controls remain native egui widgets; the visual concept artwork is not a shipped UI asset.
 
-## Guvenlik gereksinimleri
+The packaged GUI executable supports the explicitly requested `--headless-self-test` mode. It creates one harmless temporary sample, runs the same desktop scan worker used by the GUI, checks the SHA-256 result and emits a versioned success marker. Both Windows and Linux packaging CI execute this mode from the extracted archive in a relocated Unicode working directory. The test does not open a native window or validate file pickers, clipboard or rendered UI.
 
-- Tarama esnasinda EXE'leri calistirma, registry'yi degistirme,
-  dosyalari karantinaya alma/silme yok.
-- Symlink/root reparse point taramalari Core politikalarina baglidir.
-- ScanService dosya boyutunu 100 MiB ile sinirlar.
-- Hata, Skip ve Hash mesaji "virus var/yok" olarak yorumlanmaz.
-- Windows Defender/Kaspersky yerine gecmez.
-- GitHub public PR'lari FURY self-hosted runner uzerinde otomatik
-  calistirilmaz.
+No real-time protection, deletion, quarantine, driver or malware verdict is provided. Windows/Linux native GUI compilation in CI is not a substitute for real interactive smoke testing. Unsigned Windows and Linux CI archives include the Rust GUI and CLI together, plus SHA256SUMS, archive checksum and a Turkish user-facing `TEST_KILAVUZU_TR.md` quickstart. The guide is covered by the post-extraction file-count and SHA-256 verification. They are for isolated local testing, not production installers. The Windows archive also includes an opt-in PowerShell per-user setup/uninstall script, covered by SHA256SUMS. Trusted hosted Windows CI validates that the script refuses tampered files and existing installations, launches the installed desktop headless worker and removes only known files while preserving user-owned files. It does not provision a protected service, change registry entries or prove interactive Start Menu behavior.
 
-## Sonraki asama
-
-- Isletim sistemi UI acilis ve arayuz smoke testi
-- WinUI exe'nin self-contained artifact olarak paketlenmesi ve imzalanmasi
-- Guvenilir kural servisi ve uretim publisher trust root bootstrapping
-- Manuel tarama ile YARA-X raporlama; otomatik AV verdict olmadan
-
-## 0.3.1 tani ve dogrulama
-
-CI'da paket `tools/verify-desktop-preview.ps1` ile kontrol edilir:
-exe SHA-256, runtimeconfig, deps, Core/GUI DLL ve deneysel surum
-uyarisi. Bu dogrulama gercek Windows masaustu acilisinin yerine gecmez.
-
-GUI hatalari ve kritik acilis olaylari yalnizca yerelde, 
-`%LOCALAPPDATA%\\TurkuazAV\\diagnostics` dizinine yazilir.
-Dosya yollarini, SHA-256 ozetlerini veya exception mesajlarini loglamaz.
-Kullanici oturum gecmisi ise diske yazilmaz, en fazla 20 girdidir.
+Manual acceptance still required for file and folder pickers, folder progress, cancellation, clipboard, history reset, light/dark theme, compact navigation at 600px minimum width, resize, Unicode paths, Linux desktop launch, Windows desktop launch and unexpected failures. A successful automated build does not complete these manual acceptance requirements.

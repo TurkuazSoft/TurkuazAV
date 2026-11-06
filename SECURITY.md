@@ -1,25 +1,19 @@
-# 📄 Dosya Yolu: /TurkuazAV/SECURITY.md
-# 📌 Amac: Acik bildirim politikasini ve guvenli test kurallarini tanimlamak
-# 📌 Modul - FileType: Security - Markdown
-# Version: 0.2.2
-# Aciklama: Guvenlik bildirimi ve beta koruma sinirlari
-# Bagimli Oldugu Katman: Service | Tool
-
+<!--
+Dosya Yolu: REPO_ROOT/SECURITY.md
+Amac: Guvenli acik bildirimi ve Rust preview sinirlarini aciklar
+Modul - FileType: Documentation - Markdown
+Version: 0.3.1
+Aciklama: Gercek antivirus korumasi olmadan deneysel analiz
+Bagimli Oldugu Katman: Documentation
+-->
 # Security Policy
 
-TurkuazAV 0.2.2 deneysel dosya analiz aracidir. Cihazi koruyan
-antivirus, EDR veya ransomware engelleme yazilimi olarak
-kullanilmamalidir.
+TurkuazAV 0.3.1 Rust preview is **not** an antivirus, EDR, ransomware blocker or replacement for operating system protection. No realtime blocking, quarantine or malware verdict is implemented. The optional `observe` and `observe-events` CLI commands are **user-started, bounded SHA-256 observation previews**, not AV services or protection mechanisms. `observe-events` takes native OS change hints (Windows recursive directory notification, Linux inotify root-only) but always verifies them through a full-tree snapshot. Its periodic full scan remains mandatory because event delivery can be coalesced or missed. It neither blocks nor modifies files, may miss changes between polls, skips symlinks/reparse points and files over the scan size limit, and stops on partial/inaccessible scans. It only prints selected paths to the local console; no observer history is persisted.
 
-Acik ayrintilarini public issue veya PR ile yayinlamayin.
-GitHub private vulnerability reporting etkinse o kanali tercih edin.
-Henuz etkin degilse hassas istismar ayrintilarini acik depoya yazmayin.
+Do not disclose exploit details in public issues or PRs. Prefer GitHub private vulnerability reporting when available. Do not commit malware samples, secrets, private keys or customer data; use harmless test fixtures.
 
-Testlerde gercek zararli dosyalari depoya, CI artifactlerine veya
-test loglarina eklemeyin. Zararsiz ornek dosyalar kullanin.
+Publisher keyring must come from a separately trusted application bootstrap. Developer CLI public keys are not production trust roots. Pinned YARA-X engine files must be verified; pre-execution TOCTOU and subprocess isolation require additional production hardening. Version state must be stored in a protected service-owned directory.
 
-Ileri asamalarda dosya silme, karantina ve surec sonlandirma
-eklenmeden once rollback ve yanlis pozitif prosedurleri
-ayrica denetlenmelidir.
+Never disable host AV to run unsigned CI artifacts on a production system. Test on isolated machines and manually verify native GUI behavior before any production deployment.
 
-Guven modeli: [docs/security-model.md](docs/security-model.md).
+[Security model](docs/security-model.md).

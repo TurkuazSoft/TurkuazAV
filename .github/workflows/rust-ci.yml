@@ -1,0 +1,129 @@
+# Dosya Yolu: REPO_ROOT/.github/workflows/rust-ci.yml
+# Amac: Rust native motor CLI ve GUI build/test
+# Modul - FileType: CI - YAML
+# Version: 0.3.1
+# Aciklama: Uretim release olmadan test artifactlari
+# Bagimli Oldugu Katman: Tool | Config
+
+name: rust-native-ci
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+# Feature branch PRs already receive pull_request CI. Avoid a duplicate push
+# workflow and cancel superseded commits to conserve hosted runner minutes.
+concurrency:
+  group: rust-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  core-cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce Rust-only active source tree
+        shell: pwsh
+        run: ./tools/assert-rust-only.ps1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check core and CLI
+        run: cargo check --locked --bins
+      - name: Rust unit and contract tests
+        run: cargo test --locked --lib --test rust_compat
+      - name: Install pinned official YARA-X
+        shell: pwsh
+        run: ./tools/install-yarax.ps1
+      - name: Rust real YARA-X end-to-end
+        run: cargo test --locked --test yarax_e2e
+      - name: CLI process smoke tests
+        run: cargo test --locked --test cli_smoke
+      - name: Service host subprocess and signal smoke
+        run: cargo test --locked --test service_host_smoke
+      - name: Signed service update gate contract
+        run: cargo test --locked --test service_update_contract
+      - name: Transactional service update contract
+        run: cargo test --locked --test service_update_transaction
+      - name: Rust lint
+        run: cargo clippy --locked --lib --bin turkuazav --bin turkuazav-service --tests -- -D warnings
+      - name: Build release CLI
+        run: cargo build --locked --release --bin turkuazav --bin turkuazav-service
+      # Never run privileged ephemeral service registration for untrusted fork PR code.
+      # Tests are scoped to the fresh hosted CI machine; no production installation.
+      - name: Live systemd unit lifecycle and crash recovery (trusted CI)
+        if: runner.os == 'Linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        shell: bash
+        run: bash ./tools/test-service-systemd-ci.sh
+      - name: Live Windows SCM LocalService start-stop (trusted CI)
+        if: runner.os == 'Windows' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        shell: pwsh
+        run: ./tools/test-service-scm-ci.ps1
+
+  native-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Linux GUI prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libxkbcommon-dev libwayland-dev libx11-dev libasound2-dev libudev-dev
+      - name: Check Rust GUI
+        run: cargo check --locked --features desktop --bin turkuazav-desktop
+      - name: Check Rust GUI lint
+        run: cargo clippy --locked --features desktop --bin turkuazav-desktop -- -D warnings
+      - name: Test desktop lifecycle
+        run: cargo test --locked --features desktop --bin turkuazav-desktop
+      - name: Compile native GUI and CLI
+        run: cargo build --locked --release --features desktop --bins
+      - name: Verify native test binary and SHA256
+        shell: pwsh
+        run: |
+          $binary = if ($IsWindows) { 'target/release/turkuazav-desktop.exe' } else { 'target/release/turkuazav-desktop' }
+          if (!(Test-Path $binary)) { throw "Missing GUI binary: $binary" }
+          Get-FileHash -Algorithm SHA256 $binary | Format-List
+      - name: Package and verify native preview
+        shell: pwsh
+        run: ./tools/package-rust-preview.ps1
+      # CI fixture uses an isolated temp root; no end-user paths or shortcuts.
+      - name: Windows preview setup install/uninstall acceptance (trusted CI)
+        if: runner.os == 'Windows' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        shell: pwsh
+        run: ./tools/test-rust-preview-install-ci.ps1
+      - name: Upload unsigned Windows GUI test artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TurkuazAV-0.3.1-RUST-UNSIGNED-TEST-win-x64
+          path: |
+            artifacts/TurkuazAV-*-RUST-UNSIGNED-LOCAL-TEST-win-x64.zip
+            artifacts/TurkuazAV-*-RUST-UNSIGNED-LOCAL-TEST-win-x64.zip.sha256
+          retention-days: 7
+          if-no-files-found: error
+      - name: Upload unsigned Linux native test artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TurkuazAV-0.3.1-RUST-UNSIGNED-TEST-linux-x64
+          path: |
+            artifacts/TurkuazAV-*-RUST-UNSIGNED-LOCAL-TEST-linux-x64.tar.gz
+            artifacts/TurkuazAV-*-RUST-UNSIGNED-LOCAL-TEST-linux-x64.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
