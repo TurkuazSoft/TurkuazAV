@@ -21,6 +21,7 @@ pub mod threat;
 pub mod trusted;
 pub mod update;
 pub mod update_transaction;
+pub mod virustotal;
 pub mod worker;
 
 pub use desktop_rules::{DesktopRulePreflight, DesktopTrustedRules};
@@ -53,4 +54,5 @@ pub use update_transaction::{
     apply_verified_service_update, inspect_pending_service_update, CommittedServiceUpdate,
     PendingCandidateInspection, PendingUpdateInspection, ServiceActivation,
 };
+pub use virustotal::{HttpsGetRequest, HttpsGetResponse, HttpsGetTransport, VirusTotalHashSource};
 pub use worker::{SupervisedScanWorker, WorkerFault, WorkerHealth, WorkerPhase};
