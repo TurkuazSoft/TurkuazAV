@@ -157,7 +157,10 @@ impl<T: HttpsGetTransport + ?Sized> EvidenceSource for VirusTotalHashSource<'_, 
             max_response_bytes: MAX_RESPONSE_BYTES,
             follow_redirects: false,
         };
-        let response = self.transport.get(&request, cancelled)?;
+        let response = self
+            .transport
+            .get(&request, cancelled)
+            .map_err(|_| anyhow::anyhow!("Provider transport unavailable"))?;
         if cancelled.load(Ordering::Relaxed) {
             bail!("Hash lookup cancelled");
         }
@@ -299,6 +302,24 @@ mod tests {
             .unwrap();
             assert_eq!(result.observations[0].signal, SourceSignal::Unavailable);
         }
+    }
+
+    struct LeakingErrorTransport;
+
+    impl HttpsGetTransport for LeakingErrorTransport {
+        fn get(&self, _: &HttpsGetRequest<'_>, _: &AtomicBool) -> Result<HttpsGetResponse> {
+            bail!("accidental secret fixture_key");
+        }
+    }
+
+    #[test]
+    fn transport_errors_never_expose_provider_credentials() {
+        let transport = LeakingErrorTransport;
+        let source = VirusTotalHashSource::new(&transport, "fixture_key").unwrap();
+        let failure = source
+            .lookup_sha256(DIGEST, MAX_LOOKUP_TIME, &AtomicBool::new(false))
+            .unwrap_err();
+        assert_eq!(failure.to_string(), "Provider transport unavailable");
     }
 
     #[test]
