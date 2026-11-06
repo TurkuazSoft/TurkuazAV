@@ -202,11 +202,7 @@ mod tests {
     }
 
     impl HttpsGetTransport for FixtureTransport {
-        fn get(
-            &self,
-            request: &HttpsGetRequest<'_>,
-            _: &AtomicBool,
-        ) -> Result<HttpsGetResponse> {
+        fn get(&self, request: &HttpsGetRequest<'_>, _: &AtomicBool) -> Result<HttpsGetResponse> {
             self.calls.fetch_add(1, Ordering::Relaxed);
             assert_eq!(
                 request.url,
