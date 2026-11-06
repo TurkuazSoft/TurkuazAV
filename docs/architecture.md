@@ -13,6 +13,7 @@ Bagimli Oldugu Katman: Documentation
 - `rust/src/scanner.rs`: product-level ScannerBackend API, SHA-256 adapter and signed YARA-X adapter, cancellation guard and path-free ScannerReport
 - `rust/src/threat.rs`: neutral threat category, coverage, verdict and bounded evidence model; never creates a clean or malware verdict from hash/rule matches
 - `rust/src/source_evidence.rs`: bounded local SHA-256 evidence collection and digest/provider-scoped opt-in contract for future remote providers; no network adapter wired by default
+- `rust/src/virustotal.rs`: provider-specific hash-only v3 report adapter with a fixed HTTPS endpoint, generic bounded response parser and injected (not yet implemented) HTTPS transport
 - `rust/src/policy.rs`: pure advisory decisions from ScannerReport; incomplete or inconsistent evidence requests another analysis, never automatic blocking
 - `rust/src/monitor.rs`: bounded read-only SHA-256 directory polling and in-memory delta state
 - `rust/src/native_events.rs`: opt-in Windows recursive change notification / Linux inotify root notification hint adapter; periodic full-tree polling fallback remains authoritative, no daemon or blocking hook
@@ -79,6 +80,37 @@ redirects before remote lookups can be enabled.
 `Signal`, `NoSignal` and `Unavailable` remain attributed observations,
 not antivirus verdicts, threat-family assertions or authorization to block
 or quarantine files. The default preview performs no remote lookups.
+
+### VirusTotal report adapter (contract and fixture tests only)
+
+The optional `VirusTotalHashSource` implements `EvidenceSource` as a
+**remote** source, so the existing SHA-256/provider-scoped approval is
+required *before* a transport is invoked. Its only endpoint is the fixed
+`GET https://www.virustotal.com/api/v3/files/{sha256}`. The API credential
+is injected at runtime into an `x-apikey` header; neither the credential nor
+a local path enters the URL or reports. No file bytes are uploaded.
+
+The `HttpsGetTransport` contract requires TLS certificate/hostname
+verification, redirects disabled, a 1-second connect and 3-second overall
+budget, plus a 512 KiB response limit **while receiving**. The adapter also
+checks the returned body size, JSON shape, matching SHA-256 and nonempty
+analysis counters. Missing reports, rate limits, non-200 responses, oversized
+or malformed JSON, or mismatched digests become `Unavailable`. Vendor
+detections are represented only as `Signal` or `NoSignal`; they never grant
+quarantine/blocking authority. A `NoSignal` observation is not a clean
+verdict. No automatic retries or pagination are performed.
+
+**There is no concrete network transport or UI consent workflow yet.**
+The request policy is tested with an in-memory fake. An actual implementation
+must prove TLS enforcement, redirects/proxies policy, hard timeouts,
+bounded decompression, cancellation and secret redaction with separate
+integration tests before it is exposed in the desktop.
+
+The VirusTotal public API has noncommercial usage restrictions and quotas.
+Commercial distribution requires the appropriate licensed API agreement;
+this preview must not enable it by default. See the
+[official API endpoint](https://docs.virustotal.com/reference/file-info)
+and [API usage terms](https://docs.virustotal.com/docs/difference-public-private).
 
 The policy layer is intentionally read-only: `advise(&ScannerReport)`
 checks the reported engine, scan coverage and evidence consistency.
