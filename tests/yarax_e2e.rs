@@ -20,10 +20,10 @@ use std::{
 };
 use turkuazav::trusted::{parse_manifest, signature_payload};
 use turkuazav::{
-    scan_rules, scan_rules_with_cancel, scan_trusted_rules, scan_trusted_rules_with_cancel,
-    stage_signed_rule_candidate, verify_package, AnalysisCoverage, DesktopTrustedRules,
-    PublisherDigestPin, RuleCandidatePaths, ScannerId, ThreatCategory, ThreatVerdict,
-    TrustedKeyring, TrustedScanPaths,
+    publish_verified_rule_candidate, scan_rules, scan_rules_with_cancel, scan_trusted_rules,
+    scan_trusted_rules_with_cancel, stage_signed_rule_candidate, verify_package, AnalysisCoverage,
+    CandidatePublicationPaths, DesktopTrustedRules, PublisherDigestPin, RuleCandidatePaths,
+    ScannerId, ThreatCategory, ThreatVerdict, TrustedKeyring, TrustedScanPaths,
 };
 
 const RULE: &str =
@@ -230,6 +230,72 @@ fn real_yarax_signed_and_trusted_regressions() {
     )
     .unwrap();
     assert_eq!(staged_verified.sequence, 1);
+
+    // Copy a signed candidate into a new versioned directory without
+    // selecting it as active or advancing the 40-byte state.
+    let versions_root = temp.path().join("versioned-candidates");
+    fs::create_dir(&versions_root).unwrap();
+    let locations = CandidatePublicationPaths {
+        repository_root: &versions_root,
+        engine: &engine,
+        version_state: &state,
+    };
+    let published = publish_verified_rule_candidate(&candidate, &ring, locations).unwrap();
+    assert_eq!(published.sequence, 1);
+    assert_eq!(published.publisher_key_id, "trusted-a");
+    assert_eq!(fs::read(published.rules()).unwrap(), active_rules);
+    assert_eq!(
+        fs::read(published.directory().join("CANDIDATE_READY")).unwrap(),
+        b"uncommitted-candidate-only\n"
+    );
+    assert_eq!(fs::read(&state).unwrap(), version_before_candidate);
+    let version_dir = published.directory().to_path_buf();
+
+    // A collision must never overwrite or remove previously published bytes.
+    assert!(publish_verified_rule_candidate(
+        &candidate,
+        &ring,
+        CandidatePublicationPaths {
+            repository_root: &versions_root,
+            engine: &engine,
+            version_state: &state,
+        },
+    )
+    .is_err());
+    assert_eq!(
+        fs::read(version_dir.join("rules.yar")).unwrap(),
+        active_rules
+    );
+    assert_eq!(fs::read_dir(&versions_root).unwrap().count(), 1);
+
+    // Tampered staged bytes cannot be re-published; READY does not confer
+    // authority on a persistent directory if its bytes are later altered.
+    fs::write(candidate.rules(), b"untrusted staged replacement").unwrap();
+    assert!(publish_verified_rule_candidate(
+        &candidate,
+        &ring,
+        CandidatePublicationPaths {
+            repository_root: &versions_root,
+            engine: &engine,
+            version_state: &state,
+        },
+    )
+    .is_err());
+    assert_eq!(fs::read_dir(&versions_root).unwrap().count(), 1);
+    fs::write(candidate.rules(), &active_rules).unwrap();
+    fs::write(
+        version_dir.join("rules.yar"),
+        b"untrusted retained replacement",
+    )
+    .unwrap();
+    assert!(verify_package(
+        &version_dir.join("rules.yar"),
+        &version_dir.join("manifest.json"),
+        &version_dir.join("rules.sig"),
+        &ring,
+    )
+    .is_err());
+    assert_eq!(fs::read(&state).unwrap(), version_before_candidate);
 
     // Replacing the source after staging cannot modify the verified copy.
     fs::write(&rules, b"tampered source after staging").unwrap();

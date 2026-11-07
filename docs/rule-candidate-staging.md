@@ -38,6 +38,35 @@ protected staging parent. The preview still ships no production root.
   There is no active-rule overwrite, version commitment, engine
   execution, service restart or automatic downloading.
 
+## No-clobber versioned publication
+
+The library-only `rust/src/rule_publication.rs` can retain an already
+verified candidate under a NEW deterministic version name. It checks
+the signed staging snapshot, independently pinned YARA-X engine and
+advisory 40-byte rollback record before reserving the destination
+with `create_dir`. A preexisting directory, file or link at that name
+is **not overwritten**. Files are written with `create_new` and synced,
+the retained copies are independently signature-verified, and the
+`CANDIDATE_READY` marker is created LAST.
+
+The marker is **not authorization** to activate rules. It is not
+proof of immutable files, a trusted publisher or crash-safe publish.
+An error after reservation or power failure may leave an incomplete
+directory. Later attempts refuse to overwrite that name. The API
+neither deletes such residue nor changes active rules, rollback state
+or the running service.
+
+Concurrent writers and hostile filesystem actors are not excluded by
+path-based checks. The 40-byte state inspection is advisory only.
+Production activation still requires OS ACLs, no-follow handles,
+a protected cross-process lock, a verified atomic activation pointer,
+a durable power-loss journal and a recovery policy. Every reader MUST
+verify signed contents and protected state again regardless of READY.
+
+Real signed YARA-X E2E tests cover a published candidate, duplicate
+version refusal, modified staged bytes, tampered retained contents and
+state preservation.
+
 ## Limits before any production activation
 
 This is **not** an atomic installer or verified permanent store.
