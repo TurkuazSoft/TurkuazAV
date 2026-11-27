@@ -1,9 +1,11 @@
-# 📄 Dosya Yolu: /TurkuazAV/README.md
-# 📌 Amac: TurkuazAV 0.3.1 GUI ve guvenli tarama test mimarisini tanimlamak
-# 📌 Modul - FileType: Documentation - Markdown
-# Version: 0.3.1
-# Aciklama: WinUI 3 preview ile ortak Windows/Linux tarama altyapisi
-# Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
+<!--
+Dosya Yolu: REPO_ROOT/README.md
+Amac: TurkuazAV 0.3.1 GUI ve guvenli tarama test mimarisini tanimlamak
+Modul - Markdown
+Version: 0.3.1
+Aciklama: WinUI 3 preview ile ortak Windows/Linux tarama altyapisi
+Bagimli Oldugu Katman: Controller | Service | Repo | Tool | View | Language
+-->
 
 # TurkuazAV
 
